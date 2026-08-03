@@ -1,0 +1,7 @@
+openwrt/
+*.bin
+*.img
+*.trx
+*.tar
+*.gz
+*.log
