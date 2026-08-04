@@ -1,0 +1,57 @@
+#!/bin/sh
+
+case "$1" in
+
+list)
+
+cat <<EOF
+{
+ "dashboard": {
+  "read": true
+ }
+}
+EOF
+
+;;
+
+call)
+
+case "$2" in
+
+read)
+
+echo "{"
+
+echo '"uptime":"'
+uptime | cut -d',' -f1
+echo '",'
+
+echo '"load":"'
+cat /proc/loadavg | cut -d' ' -f1-3
+echo '",'
+
+echo '"memory":"'
+free | awk '/Mem/ {print $3 "/" $2}'
+echo '",'
+
+echo '"ath11k_nss":"'
+cat /sys/module/ath11k/parameters/nss_offload 2>/dev/null
+echo '",'
+
+echo '"ecm_ipv4":"'
+cat /sys/kernel/debug/ecm/ecm_nss_ipv4/accelerated_count 2>/dev/null
+echo '",'
+
+echo '"nss_modules":"'
+lsmod | grep qca_nss | wc -l
+echo '"'
+
+echo "}"
+
+;;
+
+esac
+
+;;
+
+esac
