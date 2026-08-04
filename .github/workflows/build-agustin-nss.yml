@@ -1,10 +1,10 @@
-name: Build Agustin NSS DL-WRX36
+name: Build DL-WRX36 NSS Monster
 
 on:
   workflow_dispatch:
-  #push:
-    #branches:
-      #- main
+#  push:
+#    branches:
+#      - main
 
 env:
   OPENWRT_REPO: https://github.com/AgustinLorenzo/openwrt.git
@@ -26,10 +26,11 @@ jobs:
       run: |
         sudo rm -rf /usr/local/lib/android
         sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
         sudo apt clean
 
 
-    - name: Install packages
+    - name: Install dependencies
       run: |
         sudo apt update
         sudo apt install -y \
@@ -39,6 +40,7 @@ jobs:
           bison \
           g++ \
           gawk \
+          gcc-multilib \
           gettext \
           git \
           libncurses-dev \
@@ -55,16 +57,25 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ~/.ccache
-        key: ccache-${{ github.sha }}
+        key: openwrt-ccache-${{ github.run_id }}
         restore-keys: |
-          ccache-
+          openwrt-ccache-
+
+
+    - name: Restore OpenWrt dl cache
+      uses: actions/cache@v4
+      with:
+        path: openwrt/dl
+        key: openwrt-dl-${{ github.run_id }}
+        restore-keys: |
+          openwrt-dl-
 
 
     - name: Clone Agustin NSS
       run: |
         git clone \
-          --branch $OPENWRT_BRANCH \
           --depth 1 \
+          --branch $OPENWRT_BRANCH \
           $OPENWRT_REPO \
           openwrt
 
@@ -74,24 +85,27 @@ jobs:
         cp configs/dl-wrx36.config openwrt/.config
 
 
-    - name: Configure
+    - name: Apply custom files
+      run: |
+        if [ -d files ]; then
+          cp -rv files/* openwrt/files/ || true
+        fi
+
+
+    - name: Update feeds
       working-directory: openwrt
       run: |
         ./scripts/feeds update -a
         ./scripts/feeds install -a
+
+
+    - name: Defconfig
+      working-directory: openwrt
+      run: |
         make defconfig
 
 
-    - name: Restore downloads cache
-      uses: actions/cache@v4
-      with:
-        path: openwrt/dl
-        key: openwrt-dl-${{ hashFiles('configs/dl-wrx36.config') }}
-        restore-keys: |
-          openwrt-dl-
-
-
-    - name: Download
+    - name: Download sources
       working-directory: openwrt
       run: |
         make download -j8
@@ -99,33 +113,26 @@ jobs:
 
     - name: Build firmware
       working-directory: openwrt
+      env:
+        CONFIG_CCACHE: 1
       run: |
         export PATH="/usr/lib/ccache:$PATH"
-        export CCACHE_DIR=$HOME/.ccache
-        ccache -M 5G
+        ccache -M 10G
         make -j$(nproc) V=s
 
 
-    - name: Locate firmware
+    - name: Prepare artifacts
       run: |
         mkdir -p artifacts
-
-        echo "Searching firmware..."
-
-        find openwrt/bin/targets -type f \
-          \( -name "*sysupgrade*" -o -name "*factory*" \)
 
         cp openwrt/bin/targets/qualcommax/ipq807x/*sysupgrade* artifacts/ || true
         cp openwrt/bin/targets/qualcommax/ipq807x/*factory* artifacts/ || true
 
-        ls -lah artifacts
+        echo "BUILD: $GITHUB_RUN_NUMBER" > artifacts/build-info.txt
 
 
     - name: Upload firmware
       uses: actions/upload-artifact@v4
       with:
-        name: DL-WRX36-Agustin-NSS
+        name: DL-WRX36-NSS-Monster-${{ github.run_number }}
         path: artifacts/
-
-
- 
