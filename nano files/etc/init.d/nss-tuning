@@ -1,0 +1,31 @@
+#!/bin/sh /etc/rc.common
+
+START=15
+
+start()
+{
+	logger -t NSS "Starting NSS datapath tuning"
+
+	# Enable NSS drivers
+
+	for mod in qca_nss_drv qca_nss_dp qca_nss_ecm
+	do
+		modprobe $mod 2>/dev/null
+	done
+
+
+	# Enable ECM acceleration
+
+	if [ -d /sys/kernel/debug/ecm ]
+	then
+
+		for f in /sys/kernel/debug/ecm/ecm_nss_ipv4/*accelerated*
+		do
+			echo 1 > $f 2>/dev/null
+		done
+
+	fi
+
+
+	logger -t NSS "NSS datapath ready"
+}
