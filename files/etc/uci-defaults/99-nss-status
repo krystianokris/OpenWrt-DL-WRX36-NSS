@@ -6,6 +6,11 @@ chmod +x /usr/libexec/rpcd/luci.ecm-status
 chmod +x /etc/init.d/nss-tuning
 /etc/init.d/nss-tuning enable
 
+chmod +x /usr/lib/sqm/nss-helper.sh
+
+chmod +x /etc/init.d/sqm-nss
+/etc/init.d/sqm-nss enable
+
 rm -f /tmp/luci-indexcache
 
 exit 0
