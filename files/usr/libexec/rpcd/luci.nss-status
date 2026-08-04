@@ -1,0 +1,41 @@
+#!/bin/sh
+
+case "$1" in
+
+list)
+cat <<EOF
+{
+ "nss_status": {
+   "read": true
+ }
+}
+EOF
+;;
+
+call)
+case "$2" in
+
+read)
+
+echo '{'
+
+echo '"ath11k":"'
+cat /sys/module/ath11k/parameters/nss_offload 2>/dev/null
+echo '",'
+
+echo '"ecm":"'
+lsmod | grep ecm | wc -l
+echo '",'
+
+echo '"modules":"'
+lsmod | grep nss | tr '\n' ';'
+echo '"'
+
+echo '}'
+
+;;
+
+esac
+;;
+
+esac
