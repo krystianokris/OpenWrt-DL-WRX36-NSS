@@ -73,11 +73,13 @@ jobs:
 
     - name: Clone Agustin NSS
       run: |
+        rm -rf openwrt
+
         git clone \
-          --depth 1 \
-          --branch $OPENWRT_BRANCH \
-          $OPENWRT_REPO \
-          openwrt
+        --depth 1 \
+        --branch $OPENWRT_BRANCH \
+        $OPENWRT_REPO \
+        openwrt
 
 
     - name: Copy config
