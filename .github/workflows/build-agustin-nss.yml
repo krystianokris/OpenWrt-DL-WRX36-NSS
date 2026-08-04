@@ -88,7 +88,11 @@ jobs:
     - name: Apply custom files
       run: |
         if [ -d files ]; then
-          cp -rv files/* openwrt/files/ || true
+          echo "Applying custom files overlay..."
+          mkdir -p openwrt/files
+          cp -a files/. openwrt/files/
+        else
+          echo "No custom files directory found"
         fi
 
 
