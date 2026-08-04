@@ -1,0 +1,10 @@
+{
+ "admin/status/nssdashboard": {
+  "title": "DL-WRX36 NSS Dashboard",
+  "order": 98,
+  "action": {
+   "type": "view",
+   "path": "nssdashboard/status"
+  }
+ }
+}
