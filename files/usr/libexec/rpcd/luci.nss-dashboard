@@ -38,6 +38,14 @@ echo '"ath11k_nss":"'
 cat /sys/module/ath11k/parameters/nss_offload 2>/dev/null
 echo '",'
 
+echo '"wifi_irqs":"'
+grep ath11k /proc/interrupts | wc -l
+echo '",'
+
+echo '"wifi_channels":"'
+iwinfo 2>/dev/null | grep Channel | head -1
+echo '",'
+
 echo '"ecm_ipv4":"'
 cat /sys/kernel/debug/ecm/ecm_nss_ipv4/accelerated_count 2>/dev/null
 echo '",'
