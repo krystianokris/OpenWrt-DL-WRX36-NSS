@@ -1,6 +1,7 @@
 #!/bin/sh
 
 chmod +x /usr/libexec/rpcd/luci.nss-status
+chmod +x /usr/libexec/rpcd/luci.ecm-status
 
 rm -f /tmp/luci-indexcache
 
