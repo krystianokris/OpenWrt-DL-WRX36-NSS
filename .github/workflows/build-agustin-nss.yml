@@ -95,6 +95,11 @@ jobs:
           echo "No custom files directory found"
         fi
 
+    - name: Check custom files
+      run: |
+        echo "Files installed:"
+        find openwrt/files -type f | head -50
+
 
     - name: Update feeds
       working-directory: openwrt
