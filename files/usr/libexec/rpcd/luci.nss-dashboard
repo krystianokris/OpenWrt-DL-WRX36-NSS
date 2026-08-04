@@ -50,6 +50,18 @@ echo '"ecm_ipv4":"'
 cat /sys/kernel/debug/ecm/ecm_nss_ipv4/accelerated_count 2>/dev/null
 echo '",'
 
+echo '"ecm_tcp":"'
+cat /sys/kernel/debug/ecm/ecm_nss_ipv4/tcp_accelerated_count 2>/dev/null
+echo '",'
+
+echo '"ecm_udp":"'
+cat /sys/kernel/debug/ecm/ecm_nss_ipv4/udp_accelerated_count 2>/dev/null
+echo '",'
+
+echo '"ecm_total":"'
+cat /sys/kernel/debug/ecm/ecm_nss_ipv4/accelerated_count 2>/dev/null
+echo '",'
+
 echo '"nss_modules":"'
 lsmod | grep qca_nss | wc -l
 echo '"'
