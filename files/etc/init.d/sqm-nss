@@ -1,0 +1,15 @@
+#!/bin/sh /etc/rc.common
+
+START=60
+
+start()
+{
+	logger -t SQM-NSS "Checking NSS acceleration"
+
+	if lsmod | grep -q qca_nss_drv
+	then
+		logger -t SQM-NSS "NSS driver active"
+	else
+		logger -t SQM-NSS "NSS driver missing"
+	fi
+}
