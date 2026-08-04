@@ -1,0 +1,12 @@
+{
+ "luci-app-nss-dashboard": {
+  "description": "DL-WRX36 NSS Dashboard",
+  "read": {
+   "ubus": {
+    "luci.nss-dashboard": [
+     "dashboard"
+    ]
+   }
+  }
+ }
+}
