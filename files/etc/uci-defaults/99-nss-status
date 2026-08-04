@@ -13,6 +13,9 @@ chmod +x /etc/init.d/sqm-nss
 
 chmod +x /usr/libexec/rpcd/luci.nss-dashboard
 
+chmod +x /etc/init.d/wifi-nss-tuning
+/etc/init.d/wifi-nss-tuning enable
+
 rm -f /tmp/luci-indexcache
 
 exit 0
