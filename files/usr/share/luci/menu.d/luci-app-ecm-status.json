@@ -1,0 +1,10 @@
+{
+ "admin/status/ecm": {
+  "title": "ECM Status",
+  "order": 100,
+  "action": {
+   "type": "view",
+   "path": "ecm/status"
+  }
+ }
+}
