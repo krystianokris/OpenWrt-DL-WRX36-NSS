@@ -1,0 +1,24 @@
+#!/bin/sh /etc/rc.common
+
+START=15
+
+start()
+{
+	echo "Applying NSS tuning..."
+
+	# ECM limits
+	[ -e /sys/kernel/debug/ecm/ecm_nss_ipv4/driver_fail_limit_default ] && \
+	echo 0 > /sys/kernel/debug/ecm/ecm_nss_ipv4/driver_fail_limit_default
+
+	[ -e /sys/kernel/debug/ecm/ecm_nss_ipv4/no_action_limit_default ] && \
+	echo 250 > /sys/kernel/debug/ecm/ecm_nss_ipv4/no_action_limit_default
+
+	[ -e /sys/kernel/debug/ecm/ecm_nss_ipv4/nack_limit_default ] && \
+	echo 250 > /sys/kernel/debug/ecm/ecm_nss_ipv4/nack_limit_default
+
+
+	# enable fq
+	sysctl -w net.core.default_qdisc=fq >/dev/null 2>&1
+
+	echo "NSS tuning done"
+}
