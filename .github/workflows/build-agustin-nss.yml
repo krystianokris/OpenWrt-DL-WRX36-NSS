@@ -2,9 +2,9 @@ name: Build Agustin NSS DL-WRX36
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
+  #push:
+    #branches:
+      #- main
 
 env:
   OPENWRT_REPO: https://github.com/AgustinLorenzo/openwrt.git
@@ -128,9 +128,4 @@ jobs:
         path: artifacts/
 
 
-    - name: Create Release
-      uses: softprops/action-gh-release@v2
-      with:
-        tag_name: build-${{ github.run_number }}
-        name: DL-WRX36 NSS build ${{ github.run_number }}
-        files: artifacts/*
+ 
