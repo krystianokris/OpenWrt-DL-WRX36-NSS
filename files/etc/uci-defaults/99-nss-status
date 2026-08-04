@@ -11,6 +11,8 @@ chmod +x /usr/lib/sqm/nss-helper.sh
 chmod +x /etc/init.d/sqm-nss
 /etc/init.d/sqm-nss enable
 
+chmod +x /usr/libexec/rpcd/luci.nss-dashboard
+
 rm -f /tmp/luci-indexcache
 
 exit 0
