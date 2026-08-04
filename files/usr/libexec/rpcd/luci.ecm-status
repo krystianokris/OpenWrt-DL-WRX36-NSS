@@ -1,0 +1,46 @@
+#!/bin/sh
+
+case "$1" in
+
+list)
+cat <<EOF
+{
+ "ecm_status": {
+  "read": true
+ }
+}
+EOF
+;;
+
+call)
+
+case "$2" in
+
+read)
+
+echo "{"
+
+echo '"ipv4_accelerated":"'
+cat /sys/kernel/debug/ecm/ecm_nss_ipv4/accelerated_count 2>/dev/null
+echo '",'
+
+echo '"ipv4_tcp":"'
+cat /sys/kernel/debug/ecm/ecm_nss_ipv4/tcp_accelerated_count 2>/dev/null
+echo '",'
+
+echo '"ipv4_udp":"'
+cat /sys/kernel/debug/ecm/ecm_nss_ipv4/udp_accelerated_count 2>/dev/null
+echo '",'
+
+echo '"pending_accel":"'
+cat /sys/kernel/debug/ecm/ecm_nss_ipv4/pending_accel_count 2>/dev/null
+echo '"'
+
+echo "}"
+
+;;
+
+esac
+;;
+
+esac
