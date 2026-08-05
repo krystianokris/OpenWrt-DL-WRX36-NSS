@@ -1,0 +1,46 @@
+name: Check Agustin NSS updates
+
+on:
+  schedule:
+    - cron: "0 8 * * *"
+
+  workflow_dispatch:
+
+
+jobs:
+
+  check:
+
+    runs-on: ubuntu-24.04
+
+    steps:
+
+    - name: Checkout
+      uses: actions/checkout@v4
+
+
+    - name: Check Agustin main_nss
+      run: |
+
+        REMOTE=$(git ls-remote https://github.com/AgustinLorenzo/openwrt.git main_nss | awk '{print $1}')
+
+        echo "Latest Agustin NSS:"
+        echo "$REMOTE"
+
+        if [ -f .agustin_revision ]; then
+
+          OLD=$(cat .agustin_revision)
+
+          echo "Current:"
+          echo "$OLD"
+
+          if [ "$OLD" != "$REMOTE" ]; then
+             echo "NEW AGUSTIN NSS UPDATE AVAILABLE"
+             exit 1
+          fi
+
+        else
+
+          echo "$REMOTE" > .agustin_revision
+
+        fi

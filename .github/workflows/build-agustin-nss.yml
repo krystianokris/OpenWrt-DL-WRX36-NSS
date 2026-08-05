@@ -81,6 +81,27 @@ jobs:
         $OPENWRT_REPO \
         openwrt
 
+     - name: Save Agustin revision
+      run: |
+        AGUSTIN_REV=$(cd openwrt && git rev-parse --short HEAD)
+
+        cat > files/etc/dl-wrx36-nss-build <<EOF
+DL-WRX36 NSS
+Build: $(date -u +%Y-%m-%d)
+Firmware: AgustinLorenzo main_nss
+Revision: $AGUSTIN_REV
+Target: qualcommax/ipq807x Dynalink DL-WRX36
+
+Features:
+- NSS acceleration
+- ECM status
+- NSS status
+- NSS dashboard
+- OpenWrt 2020 theme
+- ath11k NSS tuning
+- SQM NSS helper
+EOF
+
 
     - name: Copy config
       run: |
