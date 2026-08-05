@@ -4,7 +4,7 @@
   "read": {
    "ubus": {
     "luci.nss-status": [
-     "nss_status"
+     "read"
     ]
    }
   }
