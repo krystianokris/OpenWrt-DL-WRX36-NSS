@@ -17,4 +17,9 @@ chmod +x /etc/init.d/wifi-nss-tuning
 
 rm -rf /tmp/luci-indexcache /tmp/luci-modulecache /tmp/rpcd
 
+uci set luci.main.mediaurlbase='/luci-static/openwrt2020'
+uci commit luci
+
+rm -rf /tmp/luci-indexcache /tmp/luci-modulecache /tmp/rpcd
+
 exit 0
