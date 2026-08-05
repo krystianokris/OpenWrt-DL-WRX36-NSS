@@ -83,7 +83,6 @@ jobs:
 
     - name: Create build information
       run: |
-
         AGUSTIN_REV=$(cd openwrt && git rev-parse --short HEAD)
 
         mkdir -p files/etc
