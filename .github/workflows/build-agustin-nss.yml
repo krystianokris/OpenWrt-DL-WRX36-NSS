@@ -1,16 +1,15 @@
-name: Build DL-WRX36 NSS
+name: Build DL-WRX36 NSS Performance
 
 on:
   workflow_dispatch:
-#  push:
-#    branches:
-#      - main
+
 permissions:
   contents: write
 
 env:
   OPENWRT_REPO: https://github.com/AgustinLorenzo/openwrt.git
   OPENWRT_BRANCH: main_nss
+  TARGET: qualcommax/ipq807x
 
 jobs:
 
@@ -24,7 +23,7 @@ jobs:
       uses: actions/checkout@v4
 
 
-    - name: Free disk
+    - name: Free disk space
       run: |
         sudo rm -rf /usr/local/lib/android
         sudo rm -rf /usr/share/dotnet
@@ -59,57 +58,98 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ~/.ccache
-        key: openwrt-ccache-${{ github.run_id }}
+        key: ccache-${{ runner.os }}-${{ hashFiles('configs/dl-wrx36.config') }}
         restore-keys: |
-          openwrt-ccache-
+          ccache-${{ runner.os }}-
 
 
-    - name: Restore OpenWrt dl cache
+    - name: Restore OpenWrt download cache
       uses: actions/cache@v4
       with:
         path: openwrt/dl
-        key: openwrt-dl-${{ github.run_id }}
+        key: openwrt-dl-${{ hashFiles('configs/dl-wrx36.config') }}
         restore-keys: |
           openwrt-dl-
 
 
     - name: Clone Agustin NSS
       run: |
+
         rm -rf openwrt
 
         git clone \
-        --depth 1 \
-        --branch $OPENWRT_BRANCH \
-        $OPENWRT_REPO \
-        openwrt
+          --depth 1 \
+          --branch $OPENWRT_BRANCH \
+          $OPENWRT_REPO \
+          openwrt
+
+
+    - name: Save Agustin revision
+      run: |
+
+        AGUSTIN_REV=$(cd openwrt && git rev-parse --short HEAD)
+
+        echo "$AGUSTIN_REV" > .agustin_revision
+
+        mkdir -p files/etc
+
+        cat > files/etc/dl-wrx36-nss-build <<EOF
+DL-WRX36 NSS Performance Edition
+
+Build date:
+$(date -u +"%Y-%m-%d %H:%M UTC")
+
+Firmware:
+AgustinLorenzo OpenWrt NSS
+
+Branch:
+$OPENWRT_BRANCH
+
+Revision:
+$AGUSTIN_REV
+
+Target:
+qualcommax/ipq807x Dynalink DL-WRX36
+
+Features:
+- Qualcomm NSS acceleration
+- ECM acceleration
+- ath11k NSS offload
+- NSS dashboard
+- ECM dashboard
+- OpenWrt 2020 theme
+- IRQ tuning
+EOF
+
 
     - name: Copy config
       run: |
+
         cp configs/dl-wrx36.config openwrt/.config
 
 
     - name: Apply custom files
       run: |
-        if [ -d files ]; then
-          echo "Applying custom files overlay..."
-          mkdir -p openwrt/files
-          cp -a files/. openwrt/files/
-        else
-          echo "No custom files directory found"
-        fi
 
-    - name: Check custom files
+        mkdir -p openwrt/files
+
+        cp -a files/. openwrt/files/
+
+
+    - name: Verify custom files
       run: |
-        echo "Files installed:"
-        find openwrt/files -type f
+
         test -f openwrt/files/usr/libexec/rpcd/luci.nss-dashboard
         test -f openwrt/files/usr/libexec/rpcd/luci.nss-status
         test -f openwrt/files/usr/libexec/rpcd/luci.ecm-status
+
+        echo "Custom files OK"
 
 
     - name: Update feeds
       working-directory: openwrt
       run: |
+
         ./scripts/feeds update -a
         ./scripts/feeds install -a
 
@@ -117,6 +157,7 @@ jobs:
     - name: Defconfig
       working-directory: openwrt
       run: |
+
         make defconfig
         ./scripts/diffconfig.sh > diffconfig.txt
 
@@ -124,6 +165,7 @@ jobs:
     - name: Download sources
       working-directory: openwrt
       run: |
+
         make download -j8
 
 
@@ -132,34 +174,68 @@ jobs:
       env:
         CONFIG_CCACHE: 1
       run: |
+
         export PATH="/usr/lib/ccache:$PATH"
+
         ccache -M 10G
+
         make -j$(nproc) V=s
 
 
     - name: Prepare artifacts
       run: |
+
         mkdir -p artifacts
 
-        cp openwrt/bin/targets/qualcommax/ipq807x/*sysupgrade* artifacts/ || true
-        cp openwrt/bin/targets/qualcommax/ipq807x/*factory* artifacts/ || true
+        cp openwrt/bin/targets/${TARGET}/*sysupgrade* artifacts/ || true
+        cp openwrt/bin/targets/${TARGET}/*factory* artifacts/ || true
 
-        echo "BUILD: $GITHUB_RUN_NUMBER" > artifacts/build-info.txt
+        cp files/etc/dl-wrx36-nss-build artifacts/
+
+        echo "Agustin revision:"
+        cat .agustin_revision
 
 
     - name: Upload firmware
       uses: actions/upload-artifact@v4
       with:
+
         name: DL-WRX36-NSS-${{ github.run_number }}
+
         path: artifacts/
+
 
     - name: Create Release
       uses: softprops/action-gh-release@v2
+
       if: success()
+
       with:
-        tag_name: build-${{ github.run_number }}
-        name: Build ${{ github.run_number }}
+
+        tag_name: dl-wrx36-${{ github.run_number }}
+
+        name: DL-WRX36 NSS Performance Build ${{ github.run_number }}
+
+        body: |
+
+          DL-WRX36 NSS Performance Edition
+
+          Agustin revision:
+          ${{ hashFiles('.agustin_revision') }}
+
+          Target:
+          qualcommax/ipq807x Dynalink DL-WRX36
+
+          Features:
+          - NSS acceleration
+          - ECM
+          - ath11k NSS
+          - LuCI dashboard
+
         files: artifacts/*
+
         generate_release_notes: true
+
       env:
+
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
