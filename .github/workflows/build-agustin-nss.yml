@@ -81,39 +81,10 @@ jobs:
           openwrt
 
 
-    - name: Create build information
-      run: |
-        AGUSTIN_REV=$(cd openwrt && git rev-parse --short HEAD)
-
-        mkdir -p files/etc
-
-        cat > files/etc/dl-wrx36-nss-build <<EOF
-DL-WRX36 NSS Performance Edition
-
-Build:
-$(date -u +"%Y-%m-%d %H:%M UTC")
-
-Firmware:
-AgustinLorenzo OpenWrt NSS
-
-Branch:
-$OPENWRT_BRANCH
-
-Revision:
-$AGUSTIN_REV
-
-Target:
-qualcommax/ipq807x Dynalink DL-WRX36
-
-Features:
-- Qualcomm NSS acceleration
-- ECM acceleration
-- ath11k NSS offload
-- NSS dashboard
-- ECM dashboard
-- OpenWrt 2020 theme
-- IRQ tuning
-EOF
+    Annotations
+1 error
+Invalid workflow file: .github/workflows/build-agustin-nss.yml#L91
+You have an error in your yaml syntax on line 91
 
 
     - name: Copy config
