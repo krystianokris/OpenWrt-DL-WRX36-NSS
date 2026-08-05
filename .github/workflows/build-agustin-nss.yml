@@ -74,9 +74,6 @@ jobs:
 
     - name: Clone Agustin NSS
       run: |
-
-        rm -rf openwrt
-
         git clone \
           --depth 1 \
           --branch $OPENWRT_BRANCH \
@@ -84,19 +81,17 @@ jobs:
           openwrt
 
 
-    - name: Save Agustin revision
+    - name: Create build information
       run: |
 
         AGUSTIN_REV=$(cd openwrt && git rev-parse --short HEAD)
-
-        echo "$AGUSTIN_REV" > .agustin_revision
 
         mkdir -p files/etc
 
         cat > files/etc/dl-wrx36-nss-build <<EOF
 DL-WRX36 NSS Performance Edition
 
-Build date:
+Build:
 $(date -u +"%Y-%m-%d %H:%M UTC")
 
 Firmware:
@@ -124,32 +119,26 @@ EOF
 
     - name: Copy config
       run: |
-
         cp configs/dl-wrx36.config openwrt/.config
 
 
     - name: Apply custom files
       run: |
-
         mkdir -p openwrt/files
-
         cp -a files/. openwrt/files/
 
 
     - name: Verify custom files
       run: |
-
         test -f openwrt/files/usr/libexec/rpcd/luci.nss-dashboard
         test -f openwrt/files/usr/libexec/rpcd/luci.nss-status
         test -f openwrt/files/usr/libexec/rpcd/luci.ecm-status
-
         echo "Custom files OK"
 
 
     - name: Update feeds
       working-directory: openwrt
       run: |
-
         ./scripts/feeds update -a
         ./scripts/feeds install -a
 
@@ -157,7 +146,6 @@ EOF
     - name: Defconfig
       working-directory: openwrt
       run: |
-
         make defconfig
         ./scripts/diffconfig.sh > diffconfig.txt
 
@@ -165,7 +153,6 @@ EOF
     - name: Download sources
       working-directory: openwrt
       run: |
-
         make download -j8
 
 
@@ -174,17 +161,13 @@ EOF
       env:
         CONFIG_CCACHE: 1
       run: |
-
         export PATH="/usr/lib/ccache:$PATH"
-
         ccache -M 10G
-
         make -j$(nproc) V=s
 
 
     - name: Prepare artifacts
       run: |
-
         mkdir -p artifacts
 
         cp openwrt/bin/targets/${TARGET}/*sysupgrade* artifacts/ || true
@@ -192,16 +175,11 @@ EOF
 
         cp files/etc/dl-wrx36-nss-build artifacts/
 
-        echo "Agustin revision:"
-        cat .agustin_revision
-
 
     - name: Upload firmware
       uses: actions/upload-artifact@v4
       with:
-
         name: DL-WRX36-NSS-${{ github.run_number }}
-
         path: artifacts/
 
 
@@ -211,17 +189,11 @@ EOF
       if: success()
 
       with:
-
         tag_name: dl-wrx36-${{ github.run_number }}
-
         name: DL-WRX36 NSS Performance Build ${{ github.run_number }}
 
         body: |
-
           DL-WRX36 NSS Performance Edition
-
-          Agustin revision:
-          ${{ hashFiles('.agustin_revision') }}
 
           Target:
           qualcommax/ipq807x Dynalink DL-WRX36
@@ -233,9 +205,7 @@ EOF
           - LuCI dashboard
 
         files: artifacts/*
-
         generate_release_notes: true
 
       env:
-
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
