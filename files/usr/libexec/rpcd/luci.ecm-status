@@ -1,46 +1,22 @@
 #!/bin/sh
 
-case "$1" in
-
-list)
-cat <<EOF
-{
- "ecm_status": {
-  "read": true
- }
+read_counter() {
+	[ -r "$1" ] && cat "$1" 2>/dev/null || printf '0'
 }
-EOF
-;;
 
+case "$1" in
+list)
+	printf '%s\n' '{"read":{"read":true}}'
+	;;
 call)
-
-case "$2" in
-
-read)
-
-echo "{"
-
-echo '"ipv4_accelerated":"'
-cat /sys/kernel/debug/ecm/ecm_nss_ipv4/accelerated_count 2>/dev/null
-echo '",'
-
-echo '"ipv4_tcp":"'
-cat /sys/kernel/debug/ecm/ecm_nss_ipv4/tcp_accelerated_count 2>/dev/null
-echo '",'
-
-echo '"ipv4_udp":"'
-cat /sys/kernel/debug/ecm/ecm_nss_ipv4/udp_accelerated_count 2>/dev/null
-echo '",'
-
-echo '"pending_accel":"'
-cat /sys/kernel/debug/ecm/ecm_nss_ipv4/pending_accel_count 2>/dev/null
-echo '"'
-
-echo "}"
-
-;;
-
-esac
-;;
-
+	case "$2" in
+	read)
+		ipv4="$(read_counter /sys/kernel/debug/ecm/ecm_nss_ipv4/accelerated_count)"
+		tcp="$(read_counter /sys/kernel/debug/ecm/ecm_nss_ipv4/tcp_accelerated_count)"
+		udp="$(read_counter /sys/kernel/debug/ecm/ecm_nss_ipv4/udp_accelerated_count)"
+		pending="$(read_counter /sys/kernel/debug/ecm/ecm_nss_ipv4/pending_accel_count)"
+		printf '{"ipv4_accelerated":"%s","ipv4_tcp":"%s","ipv4_udp":"%s","total_accelerated":"%s","pending_accel":"%s"}\n' "$ipv4" "$tcp" "$udp" "$ipv4" "$pending"
+		;;
+	esac
+	;;
 esac
