@@ -1,4 +1,4 @@
-# OpenWrt-DL-WRX36-NSS
+# DL-WRX36 NSS
 
 Custom OpenWrt NSS firmware for Dynalink DL-WRX36.
 
@@ -15,3 +15,4 @@ Features:
 - NSS WiFi
 - SQM NSS
 - LuCI
+- Ready-to-use NSS, ECM and system-status dashboard
