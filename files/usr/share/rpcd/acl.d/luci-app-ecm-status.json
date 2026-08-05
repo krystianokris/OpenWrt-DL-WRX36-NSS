@@ -4,7 +4,7 @@
   "read": {
    "ubus": {
     "luci.ecm-status": [
-     "ecm_status"
+     "read"
     ]
    }
   }
