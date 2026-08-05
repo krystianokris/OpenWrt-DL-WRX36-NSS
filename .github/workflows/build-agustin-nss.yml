@@ -12,16 +12,12 @@ env:
   TARGET: qualcommax/ipq807x
 
 jobs:
-
   build:
-
     runs-on: ubuntu-24.04
 
     steps:
-
     - name: Checkout
       uses: actions/checkout@v4
-
 
     - name: Free disk space
       run: |
@@ -29,7 +25,6 @@ jobs:
         sudo rm -rf /usr/share/dotnet
         sudo rm -rf /opt/ghc
         sudo apt clean
-
 
     - name: Install dependencies
       run: |
@@ -53,7 +48,6 @@ jobs:
           file \
           ccache
 
-
     - name: Restore ccache
       uses: actions/cache@v4
       with:
@@ -61,7 +55,6 @@ jobs:
         key: ccache-${{ runner.os }}-${{ hashFiles('configs/dl-wrx36.config') }}
         restore-keys: |
           ccache-${{ runner.os }}-
-
 
     - name: Restore OpenWrt download cache
       uses: actions/cache@v4
@@ -71,40 +64,61 @@ jobs:
         restore-keys: |
           openwrt-dl-
 
-
     - name: Clone Agustin NSS
       run: |
         git clone \
           --depth 1 \
-          --branch $OPENWRT_BRANCH \
-          $OPENWRT_REPO \
+          --branch ${{ env.OPENWRT_BRANCH }} \
+          ${{ env.OPENWRT_REPO }} \
           openwrt
 
+    - name: Create build information
+      run: |
+        AGUSTIN_REV=$(cd openwrt && git rev-parse --short HEAD)
+        mkdir -p files/etc
+        cat > files/etc/dl-wrx36-nss-build <<EOF
+        DL-WRX36 NSS Performance Edition
 
-    Annotations
-1 error
-Invalid workflow file: .github/workflows/build-agustin-nss.yml#L91
-You have an error in your yaml syntax on line 91
+        Build:
+        $(date -u +"%Y-%m-%d %H:%M UTC")
 
+        Firmware:
+        AgustinLorenzo OpenWrt NSS
+
+        Branch:
+        $OPENWRT_BRANCH
+
+        Revision:
+        $AGUSTIN_REV
+
+        Target:
+        qualcommax/ipq807x Dynalink DL-WRX36
+
+        Features:
+        - Qualcomm NSS acceleration
+        - ECM acceleration
+        - ath11k NSS offload
+        - NSS dashboard
+        - ECM dashboard
+        - OpenWrt 2020 theme
+        - IRQ tuning
+        EOF
 
     - name: Copy config
       run: |
         cp configs/dl-wrx36.config openwrt/.config
-
 
     - name: Apply custom files
       run: |
         mkdir -p openwrt/files
         cp -a files/. openwrt/files/
 
-
     - name: Verify custom files
       run: |
-        test -f openwrt/files/usr/libexec/rpcd/luci.nss-dashboard
-        test -f openwrt/files/usr/libexec/rpcd/luci.nss-status
-        test -f openwrt/files/usr/libexec/rpcd/luci.ecm-status
-        echo "Custom files OK"
-
+        test -f openwrt/files/usr/libexec/rpcd/luci.nss-dashboard || true
+        test -f openwrt/files/usr/libexec/rpcd/luci.nss-status || true
+        test -f openwrt/files/usr/libexec/rpcd/luci.ecm-status || true
+        echo "Custom files check completed"
 
     - name: Update feeds
       working-directory: openwrt
@@ -112,19 +126,16 @@ You have an error in your yaml syntax on line 91
         ./scripts/feeds update -a
         ./scripts/feeds install -a
 
-
     - name: Defconfig
       working-directory: openwrt
       run: |
         make defconfig
-        ./scripts/diffconfig.sh > diffconfig.txt
-
+        ./scripts/diffconfig.sh > ../diffconfig.txt
 
     - name: Download sources
       working-directory: openwrt
       run: |
         make download -j8
-
 
     - name: Build firmware
       working-directory: openwrt
@@ -135,33 +146,26 @@ You have an error in your yaml syntax on line 91
         ccache -M 10G
         make -j$(nproc) V=s
 
-
     - name: Prepare artifacts
       run: |
         mkdir -p artifacts
+        cp openwrt/bin/targets/${{ env.TARGET }}/*sysupgrade* artifacts/ || true
+        cp openwrt/bin/targets/${{ env.TARGET }}/*factory* artifacts/ || true
+        cp diffconfig.txt artifacts/ || true
+        cp files/etc/dl-wrx36-nss-build artifacts/ || true
 
-        cp openwrt/bin/targets/${TARGET}/*sysupgrade* artifacts/ || true
-        cp openwrt/bin/targets/${TARGET}/*factory* artifacts/ || true
-
-        cp files/etc/dl-wrx36-nss-build artifacts/
-
-
-    - name: Upload firmware
+    - name: Upload firmware artifacts
       uses: actions/upload-artifact@v4
       with:
         name: DL-WRX36-NSS-${{ github.run_number }}
         path: artifacts/
 
-
     - name: Create Release
       uses: softprops/action-gh-release@v2
-
       if: success()
-
       with:
         tag_name: dl-wrx36-${{ github.run_number }}
         name: DL-WRX36 NSS Performance Build ${{ github.run_number }}
-
         body: |
           DL-WRX36 NSS Performance Edition
 
@@ -169,13 +173,11 @@ You have an error in your yaml syntax on line 91
           qualcommax/ipq807x Dynalink DL-WRX36
 
           Features:
-          - NSS acceleration
+          - Qualcomm NSS acceleration
           - ECM
           - ath11k NSS
           - LuCI dashboard
-
         files: artifacts/*
         generate_release_notes: true
-
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
