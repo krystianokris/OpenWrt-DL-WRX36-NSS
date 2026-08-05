@@ -1,4 +1,4 @@
-name: Build DL-WRX36 NSS Monster
+name: Build DL-WRX36 NSS
 
 on:
   workflow_dispatch:
@@ -100,7 +100,10 @@ jobs:
     - name: Check custom files
       run: |
         echo "Files installed:"
-        find openwrt/files -type f | head -50
+        find openwrt/files -type f
+        test -f openwrt/files/usr/libexec/rpcd/luci.nss-dashboard
+        test -f openwrt/files/usr/libexec/rpcd/luci.nss-status
+        test -f openwrt/files/usr/libexec/rpcd/luci.ecm-status
 
 
     - name: Update feeds
@@ -146,5 +149,5 @@ jobs:
     - name: Upload firmware
       uses: actions/upload-artifact@v4
       with:
-        name: DL-WRX36-NSS-Monster-${{ github.run_number }}
+        name: DL-WRX36-NSS-${{ github.run_number }}
         path: artifacts/
