@@ -1,31 +1,67 @@
 # OpenWrt DL-WRX36 NSS
 
-Custom OpenWrt build for the **Dynalink DL-WRX36** based on **AgustinLorenzo OpenWrt NSS**.
+Custom OpenWrt firmware build for **Dynalink DL-WRX36** with Qualcomm NSS acceleration and additional LuCI monitoring tools.
 
-This repository provides an automated GitHub Actions workflow to build firmware with custom configuration and files for the Dynalink DL-WRX36 router.
+This project provides automated builds of OpenWrt based on the NSS-enabled branch from AgustinLorenzo with custom configuration and additional system monitoring components.
 
 ---
 
 ## Features
 
-* Qualcomm NSS acceleration
-* Based on AgustinLorenzo `main_nss`
-* Automated GitHub Actions builds
-* Custom OpenWrt configuration
-* Custom files overlay
-* Ready-to-flash firmware images
+### Qualcomm NSS Support
+
+This firmware includes Qualcomm NSS acceleration support designed to improve network performance on the DL-WRX36 platform.
+
+Included components:
+
+* NSS acceleration
+* ECM (Engine Connection Manager) support
+* NSS status monitoring
+* Custom LuCI NSS dashboard
 
 ---
 
-## Source
+## Included LuCI Tools
+
+This build contains custom LuCI integration:
+
+### NSS Dashboard
+
+Provides a quick overview of NSS-related system information.
+
+### NSS Status
+
+Displays NSS subsystem status and operation information.
+
+### ECM Status
+
+Shows ECM offload status and connection acceleration information.
+
+---
+
+## Target Device
+
+Supported hardware:
+
+**Dynalink DL-WRX36**
+
+Hardware platform:
+
+* Qualcomm IPQ807x
+* WiFi 6
+* NSS capable platform
+
+---
+
+## Build Source
 
 OpenWrt source:
 
-https://github.com/AgustinLorenzo/openwrt
+AgustinLorenzo OpenWrt NSS
 
 Branch:
 
-```
+```text
 main_nss
 ```
 
@@ -33,67 +69,102 @@ main_nss
 
 ## Repository Structure
 
-```
+```text
 .
-├── .github/workflows/    GitHub Actions workflow
-├── configs/              OpenWrt build configuration
-├── files/                Custom files overlay
+├── .github/
+│   └── workflows/
+│       └── build.yml
+│
+├── configs/
+│   └── dl-wrx36.config
+│
+├── files/
+│   └── custom LuCI/NSS files
+│
 └── README.md
 ```
 
 ---
 
-## Build
+## Automated Build
 
-The firmware is built automatically using GitHub Actions.
+Firmware is built using GitHub Actions.
 
-Workflow:
+Build process:
 
-* Clone OpenWrt source
-* Copy build configuration
-* Apply custom files
-* Update feeds
-* Compile firmware
-* Upload firmware artifacts
-
----
-
-## Firmware
-
-Generated firmware includes:
-
-* Sysupgrade image
-* Factory image (when available)
-
-The firmware is intended for:
-
-**Dynalink DL-WRX36**
+1. Clone NSS-enabled OpenWrt source
+2. Apply custom configuration
+3. Install feeds
+4. Apply custom files overlay
+5. Compile firmware
+6. Create firmware release
 
 ---
 
-## Flashing
+## Firmware Files
 
-Upgrade from an existing OpenWrt installation:
+Each release contains:
 
-1. Backup your configuration.
-2. Upload the **sysupgrade** image.
-3. Keep settings only if compatible with your previous build.
-4. Reboot the router.
+* `factory` image (when available)
+* `sysupgrade` image
+* build information
+* checksums
 
 ---
 
-## Disclaimer
+## Installation
 
-This project is provided without warranty.
+Before flashing:
 
-Always verify that you are flashing firmware intended for your exact hardware model.
+* Make a backup of your current configuration.
+* Verify that the image is intended for Dynalink DL-WRX36.
 
-Flashing custom firmware is done at your own risk.
+For upgrades from OpenWrt:
+
+Use the generated:
+
+```text
+sysupgrade image
+```
+
+For initial installation:
+
+Use the appropriate:
+
+```text
+factory image
+```
+
+---
+
+## Performance
+
+The goal of this project is to provide a DL-WRX36 firmware build focused on:
+
+* high routing performance,
+* hardware acceleration,
+* NSS visibility,
+* easier monitoring through LuCI.
 
 ---
 
 ## Credits
 
+Based on:
+
 * OpenWrt Project
-* AgustinLorenzo
-* GitHub Actions
+* AgustinLorenzo NSS OpenWrt work
+
+Additional custom integration:
+
+* NSS Dashboard
+* NSS Status
+* ECM Status
+
+---
+
+## Disclaimer
+
+This firmware is provided without warranty.
+
+Use at your own risk. Always verify the firmware image before flashing your device.
