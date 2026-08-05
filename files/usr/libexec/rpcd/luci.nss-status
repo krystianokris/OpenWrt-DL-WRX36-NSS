@@ -1,41 +1,22 @@
 #!/bin/sh
 
+json() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
+
 case "$1" in
-
 list)
-cat <<EOF
-{
- "nss_status": {
-   "read": true
- }
-}
-EOF
-;;
-
+	printf '%s\n' '{"read":{"read":true}}'
+	;;
 call)
-case "$2" in
-
-read)
-
-echo '{'
-
-echo '"ath11k":"'
-cat /sys/module/ath11k/parameters/nss_offload 2>/dev/null
-echo '",'
-
-echo '"ecm":"'
-lsmod | grep ecm | wc -l
-echo '",'
-
-echo '"modules":"'
-lsmod | grep nss | tr '\n' ';'
-echo '"'
-
-echo '}'
-
-;;
-
-esac
-;;
-
+	case "$2" in
+	read)
+		ath11k="$(cat /sys/module/ath11k/parameters/nss_offload 2>/dev/null)"
+		[ "$ath11k" = "1" ] && ath11k="Enabled" || ath11k="Disabled"
+		modules="$(lsmod 2>/dev/null | awk '$1 ~ /^qca_nss/ { printf "%s ", $1 }')"
+		[ -n "$modules" ] || modules="None loaded"
+		count="$(lsmod 2>/dev/null | awk '$1 ~ /^qca_nss/ { count++ } END { print count+0 }')"
+		printf '{"ath11k_nss":"%s","ecm_module":"%s","nss_module_count":"%s","loaded_modules":"%s"}\n' \
+			"$(json "$ath11k")" "$(lsmod 2>/dev/null | grep -q '^ecm ' && printf 'Loaded' || printf 'Not loaded')" "$count" "$(json "$modules")"
+		;;
+	esac
+	;;
 esac
