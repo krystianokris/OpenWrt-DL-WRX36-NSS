@@ -1,0 +1,15 @@
+#!/bin/sh /etc/rc.common
+
+START=20
+
+start() {
+	logger -t WIFI-NSS 'Applying ath11k NSS tuning'
+
+	if [ -w /sys/module/ath11k/parameters/nss_offload ]; then
+		echo 1 > /sys/module/ath11k/parameters/nss_offload
+	fi
+
+	for irq in $(awk '/ath11k/ { gsub(":", "", $1); print $1 }' /proc/interrupts); do
+		[ -w "/proc/irq/$irq/smp_affinity" ] && echo 2 > "/proc/irq/$irq/smp_affinity"
+	done
+}
