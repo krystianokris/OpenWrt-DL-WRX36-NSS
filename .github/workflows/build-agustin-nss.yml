@@ -115,6 +115,17 @@ jobs:
         mkdir -p openwrt/files
         cp -a files/. openwrt/files/
 
+    - name: Fix APK repositories
+      run: |
+        mkdir -p openwrt/files/etc/apk/repositories.d
+
+        cat > openwrt/files/etc/apk/repositories.d/customfeeds.list <<EOF
+        https://downloads.openwrt.org/snapshots/packages/aarch64_cortex-a53/base/packages.adb
+        https://downloads.openwrt.org/snapshots/packages/aarch64_cortex-a53/luci/packages.adb
+        https://downloads.openwrt.org/snapshots/packages/aarch64_cortex-a53/packages/packages.adb
+        https://downloads.openwrt.org/snapshots/packages/aarch64_cortex-a53/routing/packages.adb
+        EOF
+
     - name: Verify custom files
       run: |
         test -f openwrt/files/usr/libexec/rpcd/luci.nss-dashboard || true
