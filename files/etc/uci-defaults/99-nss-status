@@ -2,6 +2,7 @@
 
 chmod +x /usr/libexec/rpcd/luci.nss-status
 chmod +x /usr/libexec/rpcd/luci.ecm-status
+chmod +x /usr/libexec/rpcd/luci.nss-dashboard
 
 chmod +x /etc/init.d/nss-tuning
 /etc/init.d/nss-tuning enable
@@ -11,14 +12,9 @@ chmod +x /usr/lib/sqm/nss-helper.sh
 chmod +x /etc/init.d/sqm-nss
 /etc/init.d/sqm-nss enable
 
-chmod +x /usr/libexec/rpcd/luci.nss-dashboard
-
 chmod +x /etc/init.d/wifi-nss-tuning
 /etc/init.d/wifi-nss-tuning enable
 
-chmod +x /etc/init.d/nss-tuning
-/etc/init.d/nss-tuning enable
-
-rm -f /tmp/luci-indexcache
+rm -rf /tmp/luci-indexcache /tmp/luci-modulecache /tmp/rpcd
 
 exit 0
