@@ -114,6 +114,16 @@ jobs:
       run: |
         mkdir -p openwrt/files
         cp -a files/. openwrt/files/
+        
+    - name: Clean runtime apk feeds
+      run: |
+
+        mkdir -p openwrt/files/etc/apk/repositories.d
+
+        cat > openwrt/files/etc/apk/repositories.d/customfeeds.list <<EOF
+        # Runtime custom feeds disabled
+        # NSS/Qosmio/Julius packages included in firmware
+        EOF
 
     - name: Fix APK repositories
       run: |
@@ -144,6 +154,15 @@ jobs:
       run: |
         make defconfig
         ./scripts/diffconfig.sh > ../diffconfig.txt
+
+    - name: Remove broken apk feeds
+      working-directory: openwrt
+      run: |
+
+        sed -i '/nss-wifi-unified/d' include/feeds.mk
+        sed -i '/nss_packages/d' include/feeds.mk
+        sed -i '/qosmio/d' include/feeds.mk
+        sed -i '/sqm_scripts_nss_julius/d' include/feeds.mk
 
     - name: Download sources
       working-directory: openwrt
