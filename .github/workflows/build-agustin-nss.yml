@@ -5,6 +5,8 @@ on:
 #  push:
 #    branches:
 #      - main
+permissions:
+  contents: write
 
 env:
   OPENWRT_REPO: https://github.com/AgustinLorenzo/openwrt.git
@@ -150,3 +152,14 @@ jobs:
       with:
         name: DL-WRX36-NSS-${{ github.run_number }}
         path: artifacts/
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      if: success()
+      with:
+        tag_name: build-${{ github.run_number }}
+        name: Build ${{ github.run_number }}
+        files: artifacts/*
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
