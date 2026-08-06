@@ -16,6 +16,7 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
+
     - name: Checkout
       uses: actions/checkout@v4
 
@@ -107,10 +108,10 @@ jobs:
         ./scripts/feeds update -a
         ./scripts/feeds install -a
 
-    - name: Configure and Prepare Kernel
+    - name: Configure OpenWrt
       working-directory: openwrt
       run: |
-        make olddefconfig
+        make defconfig
         ./scripts/diffconfig.sh > ../diffconfig.txt
 
     - name: Verify LuCI files
@@ -125,11 +126,6 @@ jobs:
       run: |
         make download -j8
 
-    - name: Handle Kernel Config Updates
-      working-directory: openwrt
-      run: |
-        yes "" | make kernel_oldconfig || make oldconfig
-
     - name: Build firmware
       working-directory: openwrt
       env:
@@ -142,8 +138,10 @@ jobs:
     - name: Prepare artifacts
       run: |
         mkdir -p artifacts
+
         cp openwrt/bin/targets/${{ env.TARGET }}/*sysupgrade* artifacts/ || true
         cp openwrt/bin/targets/${{ env.TARGET }}/*factory* artifacts/ || true
+
         cp diffconfig.txt artifacts/ || true
         cp files/etc/dl-wrx36-nss-build artifacts/ || true
 
@@ -159,6 +157,7 @@ jobs:
       with:
         tag_name: dl-wrx36-${{ github.run_number }}
         name: DL-WRX36 NSS Build ${{ github.run_number }}
+
         body: |
           DL-WRX36 NSS Build
 
@@ -170,6 +169,8 @@ jobs:
           - ECM dashboard
           - NSS dashboard
           - Native LuCI JS interface
+
         files: artifacts/*
+
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
