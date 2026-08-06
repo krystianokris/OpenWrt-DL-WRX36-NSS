@@ -113,7 +113,12 @@ jobs:
       run: |
         make defconfig
         ./scripts/diffconfig.sh > ../diffconfig.txt
-
+        
+    - name: Check kernel config
+      working-directory: openwrt
+      run: |
+        grep NF_CONNTRACK_DSCPREMARK_EXT .config || true
+        
     - name: Verify LuCI files
       run: |
         echo "Checking DL-WRX36 dashboard"
