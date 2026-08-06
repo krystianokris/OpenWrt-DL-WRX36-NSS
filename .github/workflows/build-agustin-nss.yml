@@ -66,6 +66,8 @@ jobs:
 
     - name: Clone Agustin NSS
       run: |
+        rm -rf openwrt
+
         git clone \
           --depth 1 \
           --branch ${{ env.OPENWRT_BRANCH }} \
