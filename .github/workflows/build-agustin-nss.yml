@@ -107,7 +107,7 @@ jobs:
         ./scripts/feeds update -a
         ./scripts/feeds install -a
 
-    - name: Defconfig
+    - name: Configure and Prepare Kernel
       working-directory: openwrt
       run: |
         make olddefconfig
@@ -124,12 +124,12 @@ jobs:
       working-directory: openwrt
       run: |
         make download -j8
-        
-    - name: Configure Kernel
+
+    - name: Handle Kernel Config Updates
       working-directory: openwrt
       run: |
-        make kernel_oldconfig
-        
+        yes "" | make kernel_oldconfig || make oldconfig
+
     - name: Build firmware
       working-directory: openwrt
       env:
