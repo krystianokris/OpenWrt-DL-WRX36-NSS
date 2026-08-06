@@ -5,9 +5,14 @@
 <table class="table">
 
 <tr>
+<td>Firmware</td>
+<td><%=luci.sys.exec("cat /etc/dl-wrx36-nss-build")%></td>
+</tr>
+
+<tr>
 <td>NSS Driver</td>
 <td>
-<%=luci.sys.exec("lsmod | grep -q qca_nss_drv && echo ACTIVE || echo FAIL")%>
+<%=luci.sys.exec("lsmod | grep qca_nss_drv >/dev/null && echo ACTIVE || echo FAIL")%>
 </td>
 </tr>
 
@@ -15,7 +20,7 @@
 <tr>
 <td>ECM</td>
 <td>
-<%=luci.sys.exec("lsmod | grep -q '^ecm ' && echo ACTIVE || echo FAIL")%>
+<%=luci.sys.exec("lsmod | grep '^ecm ' >/dev/null && echo ACTIVE || echo FAIL")%>
 </td>
 </tr>
 
@@ -23,51 +28,36 @@
 <tr>
 <td>NSS Qdisc</td>
 <td>
-<%=luci.sys.exec("lsmod | grep -q qca_nss_qdisc && echo ACTIVE || echo FAIL")%>
+<%=luci.sys.exec("lsmod | grep qca_nss_qdisc >/dev/null && echo ACTIVE || echo FAIL")%>
 </td>
 </tr>
 
 
 <tr>
-<td>ath11k NSS Offload</td>
+<td>ath11k NSS</td>
 <td>
-<%=luci.sys.exec("cat /sys/module/ath11k/parameters/nss_offload 2>/dev/null | grep -q 1 && echo ACTIVE || echo FAIL")%>
+<%=luci.sys.exec("cat /sys/module/ath11k/parameters/nss_offload 2>/dev/null")%>
 </td>
 </tr>
 
 
 <tr>
-<td>Temperature</td>
+<td>CPU temperature</td>
 <td>
-<%=luci.sys.exec("awk '{printf \"%.1f°C\", $1/1000}' /sys/class/thermal/thermal_zone0/temp 2>/dev/null")%>
+<%=luci.sys.exec("cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null | awk '{print $1/1000 \" °C\"}'")%>
 </td>
 </tr>
 
 
 <tr>
-<td>CPU Frequency</td>
+<td>Uptime</td>
 <td>
-<%=luci.sys.exec("awk '{printf \"%d MHz\", $1/1000}' /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq 2>/dev/null")%>
-</td>
-</tr>
-
-
-<tr>
-<td>Firmware</td>
-<td>
-DL-WRX36 NSS Edition
-</td>
-</tr>
-
-
-<tr>
-<td>Release</td>
-<td>
-19
+<%=luci.sys.exec("uptime")%>
 </td>
 </tr>
 
 
 </table>
+
 
 <%+footer%>

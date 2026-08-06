@@ -3,16 +3,16 @@ module("luci.controller.dlwrx36", package.seeall)
 function index()
 
     entry(
-        {"admin","services","dlwrx36"},
+        {"admin","status","dlwrx36"},
         firstchild(),
         _("DL-WRX36 NSS"),
-        60
+        50
     )
 
     entry(
-        {"admin","services","dlwrx36","status"},
+        {"admin","status","dlwrx36","status"},
         template("dlwrx36/status"),
-        _("NSS Status"),
+        _("NSS Dashboard"),
         1
     )
 
