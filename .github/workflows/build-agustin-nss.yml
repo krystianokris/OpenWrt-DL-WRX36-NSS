@@ -128,7 +128,7 @@ jobs:
     - name: Configure Kernel
       working-directory: openwrt
       run: |
-        make kernel_oldconfig
+        yes "" | make oldconfig
         
     - name: Build firmware
       working-directory: openwrt
