@@ -74,6 +74,11 @@ jobs:
           --branch ${{ env.OPENWRT_BRANCH }} \
           ${{ env.OPENWRT_REPO }} \
           openwrt
+    - name: Fix missing kernel default
+      working-directory: openwrt
+      run: |
+        sed -i "/depends on NETFILTER_ADVANCED/a\ \ \ \ default y" \
+        target/linux/qualcommax/patches-6.12/0600-6-qca-nss-ecm-support-netfilter-DSCPREMARK.patch
 
     - name: Apply config
       run: |
