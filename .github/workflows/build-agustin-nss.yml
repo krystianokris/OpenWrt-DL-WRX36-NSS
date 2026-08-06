@@ -110,7 +110,7 @@ jobs:
     - name: Defconfig
       working-directory: openwrt
       run: |
-        make defconfig
+        make olddefconfig
         ./scripts/diffconfig.sh > ../diffconfig.txt
 
     - name: Verify LuCI files
@@ -124,7 +124,12 @@ jobs:
       working-directory: openwrt
       run: |
         make download -j8
-
+        
+    - name: Configure Kernel
+      working-directory: openwrt
+      run: |
+        make kernel_oldconfig
+        
     - name: Build firmware
       working-directory: openwrt
       env:
