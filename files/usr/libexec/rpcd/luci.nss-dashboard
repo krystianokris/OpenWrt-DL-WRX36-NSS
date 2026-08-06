@@ -72,7 +72,7 @@ call)
 
 		irqs="$(awk '/ath11k|wlan|wifi/ { count++ } END { print count+0 }' /proc/interrupts 2>/dev/null)"
 
-		printf '{"cpu_load":"%s","memory":"%s","uptime":"%s","build":"%s","ath11k_nss":"%s","nss_modules":"%s","ecm_ipv4":"%s","ecm_tcp":"%s","ecm_udp":"%s","ecm_total":"%s","ecm_pending":"%s","wifi_channel":"%s","wifi_irqs":"%s"}\n' \
+		printf '{"cpu_load":"%s","memory":"%s","uptime":"%s","build":"%s","ath11k_nss":"%s","nss_modules":"%s","ecm_ipv4":"%s","ecm_tcp":"%s","ecm_udp":"%s","ecm_total":"%s","ecm_pending":"%s","wifi_channel":"%s","wifi_irqs":"%s","temperature":"%s","qdisc":"%s","cpu_freq":"%s"}\n' \
 		"$(value "$load")" \
 		"$(value "$memory")" \
 		"$(value "$uptime")" \
