@@ -95,6 +95,14 @@ jobs:
         sed -i '/qosmio/d' include/feeds.mk || true
         sed -i '/sqm_scripts_nss_julius/d' include/feeds.mk || true
 
+    - name: Debug feed sources
+      working-directory: openwrt
+      run: |
+        echo "=== FEEDS.CONF ==="
+        cat feeds.conf.default || true
+        echo "=== FIND NSS FEEDS ==="
+        grep -R "nss\|qosmio\|sqm" -n feeds.conf* package/feeds 2>/dev/null || true
+
     - name: Update feeds
       working-directory: openwrt
       run: |
