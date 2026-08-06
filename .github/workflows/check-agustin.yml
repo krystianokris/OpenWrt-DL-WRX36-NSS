@@ -1,46 +1,64 @@
-name: Check Agustin NSS updates
+name: Check Agustin NSS Updates
 
 on:
   schedule:
     - cron: "0 8 * * *"
-
   workflow_dispatch:
 
+permissions:
+  contents: write
 
 jobs:
-
   check:
-
     runs-on: ubuntu-24.04
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - name: Checkout
-      uses: actions/checkout@v4
+      - name: Check latest Agustin commit
+        id: check
+        shell: bash
+        run: |
+          REMOTE=$(git ls-remote https://github.com/AgustinLorenzo/openwrt.git refs/heads/main_nss | awk '{print $1}')
 
+          echo "Latest Agustin commit:"
+          echo "$REMOTE"
 
-    - name: Check Agustin main_nss
-      run: |
-
-        REMOTE=$(git ls-remote https://github.com/AgustinLorenzo/openwrt.git main_nss | awk '{print $1}')
-
-        echo "Latest Agustin NSS:"
-        echo "$REMOTE"
-
-        if [ -f .agustin_revision ]; then
+          if [ ! -f .agustin_revision ]; then
+            echo "$REMOTE" > .agustin_revision
+          fi
 
           OLD=$(cat .agustin_revision)
 
-          echo "Current:"
+          echo "Stored commit:"
           echo "$OLD"
 
-          if [ "$OLD" != "$REMOTE" ]; then
-             echo "NEW AGUSTIN NSS UPDATE AVAILABLE"
-             exit 1
+          if [ "$OLD" = "$REMOTE" ]; then
+            echo "No updates found."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "New update available!"
+            echo "$REMOTE" > .agustin_revision
+            echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
-        else
+      - name: Save new revision
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          echo "$REMOTE" > .agustin_revision
+          git add .agustin_revision
+          git commit -m "Update Agustin NSS revision"
+          git push
 
-        fi
+      - name: Summary
+        run: |
+          if [ "${{ steps.check.outputs.changed }}" = "true" ]; then
+            echo "🟢 New Agustin NSS update detected!"
+          else
+            echo "✅ Repository is already up to date."
+          fi
