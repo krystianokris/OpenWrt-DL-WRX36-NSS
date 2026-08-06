@@ -105,6 +105,19 @@ jobs:
         echo "=== FIND NSS FEEDS ==="
         grep -R "nss\|qosmio\|sqm" -n feeds.conf* package/feeds 2>/dev/null || true
 
+    - name: Remove broken NSS feeds
+      working-directory: openwrt
+      run: |
+        echo "Removing broken runtime feeds"
+
+        sed -i '/nss_packages/d' feeds.conf.default
+        sed -i '/sqm_scripts_nss_julius/d' feeds.conf.default
+        sed -i '/qosmio/d' feeds.conf.default
+        sed -i '/nss-wifi-unified/d' feeds.conf.default
+
+        echo "=== Remaining feeds ==="
+        cat feeds.conf.default
+
     - name: Update feeds
       working-directory: openwrt
       run: |
