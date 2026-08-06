@@ -1,0 +1,10 @@
+{
+    "admin/status/dlwrx36-nss": {
+        "title": "DL-WRX36 NSS",
+        "order": 5,
+        "action": {
+            "type": "view",
+            "path": "dlwrx36/nss"
+        }
+    }
+}

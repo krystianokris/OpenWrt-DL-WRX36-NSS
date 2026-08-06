@@ -1,13 +1,18 @@
-DL-WRX36 NSS
-Build: 2026-08-05
-Firmware: AgustinLorenzo main_nss
-Target: qualcommax/ipq807x Dynalink DL-WRX36
+DL-WRX36 NSS Build 19
+
+Firmware:
+OpenWrt NSS Custom Build
+
+Target:
+Qualcomm IPQ807x
+Dynalink DL-WRX36
 
 Features:
-- NSS acceleration
-- ECM status
-- NSS status
-- NSS dashboard
-- OpenWrt 2020 theme
-- ath11k NSS tuning
-- SQM NSS helper
+- Qualcomm NSS acceleration
+- ECM acceleration
+- ath11k NSS offload
+- NSS qdisc
+- Custom LuCI dashboard
+
+Builder:
+Krystian
