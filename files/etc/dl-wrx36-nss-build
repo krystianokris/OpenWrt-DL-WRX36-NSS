@@ -1,14 +1,10 @@
-<<<<<<< HEAD
-DL-WRX36 NSS Custom
-=======
-DL-WRX36 NSS 
+DL-WRX36 NSS Performance Edition
 
 Build:
 2026-08-06
 
 Release:
 19
->>>>>>> 26b813b (Improve DL-WRX36 NSS dashboard monitoring)
 
 Firmware:
 AgustinLorenzo OpenWrt NSS
@@ -26,3 +22,4 @@ Features:
 - NSS qdisc
 - LuCI NSS dashboard
 - DL-WRX36 status page
+- Native LuCI JS dashboard
