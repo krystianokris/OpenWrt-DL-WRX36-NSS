@@ -114,6 +114,12 @@ jobs:
       run: |
         mkdir -p openwrt/files
         cp -a files/. openwrt/files/
+
+    - name: Remove broken runtime feeds
+      run: |
+        sed -i '/nss_packages/d' openwrt/package/base-files/files/etc/apk/repositories.d/distfeeds.list
+        sed -i '/qosmio/d' openwrt/package/base-files/files/etc/apk/repositories.d/distfeeds.list
+        sed -i '/sqm_scripts_nss_julius/d' openwrt/package/base-files/files/etc/apk/repositories.d/distfeeds.list
         
     - name: Clean runtime apk feeds
       run: |
