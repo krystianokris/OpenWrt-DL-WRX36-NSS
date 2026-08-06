@@ -74,11 +74,34 @@ jobs:
           --branch ${{ env.OPENWRT_BRANCH }} \
           ${{ env.OPENWRT_REPO }} \
           openwrt
-    - name: Fix missing kernel default
-      working-directory: openwrt
-      run: |
-        sed -i "/depends on NETFILTER_ADVANCED/a\ \ \ \ default y" \
-        target/linux/qualcommax/patches-6.12/0600-6-qca-nss-ecm-support-netfilter-DSCPREMARK.patch
+          
+        - name: Fix missing kernel default
+          working-directory: openwrt
+          run: |
+            PATCH=target/linux/qualcommax/patches-6.12/0600-6-qca-nss-ecm-support-netfilter-DSCPREMARK.patch
+
+            if [ -f "$PATCH" ]; then
+              echo "Checking $PATCH"
+
+            if grep -q "config NF_CONNTRACK_DSCPREMARK_EXT" "$PATCH"; then
+
+              if ! grep -q "default y" "$PATCH"; then
+                echo "Adding default y"
+                sed -i "/depends on NETFILTER_ADVANCED/a\\        default y" "$PATCH"
+              else
+                echo "default y already exists"
+              fi
+
+              echo "=== Result ==="
+              sed -n '/config NF_CONNTRACK_DSCPREMARK_EXT/,/help/p' "$PATCH"
+
+            else
+              echo "Config option not found"
+            fi
+
+          else
+            echo "Patch not found, skipping"
+          fi
 
     - name: Apply config
       run: |
