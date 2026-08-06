@@ -45,6 +45,22 @@ call)
 
 		modules="$(lsmod 2>/dev/null | awk '$1 ~ /^qca_nss/ { count++ } END { print count+0 }')"
 
+		temp="$(cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null)"
+		if [ -n "$temp" ]; then
+			temp="$((temp / 1000))°C"
+		else
+			temp="Unavailable"
+		fi
+
+		qdisc="$(lsmod 2>/dev/null | grep -q qca_nss_qdisc && printf 'Enabled' || printf 'Disabled')"
+
+		cpu_freq="$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq 2>/dev/null)"
+		if [ -n "$cpu_freq" ]; then
+			cpu_freq="$((cpu_freq / 1000)) MHz"
+		else
+			cpu_freq="Unknown"
+		fi
+
 		wifi="$(iwinfo 2>/dev/null | awk '/Channel:/ {
 			sub(/^.*Channel: /,"");
 			sub(/ \|.*$/,"");
@@ -69,7 +85,10 @@ call)
 		"$ipv4" \
 		"$pending" \
 		"$(value "$wifi")" \
-		"$irqs"
+		"$irqs" \
+		"$(value "$temp")" \
+		"$qdisc" \
+		"$(value "$cpu_freq")"
 
 	;;
 

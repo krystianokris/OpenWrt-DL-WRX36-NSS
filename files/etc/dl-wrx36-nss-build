@@ -1,18 +1,28 @@
+<<<<<<< HEAD
 DL-WRX36 NSS Custom Edition
+=======
+DL-WRX36 NSS Edition
+
+Build:
+2026-08-06
+
+Release:
+19
+>>>>>>> 26b813b (Improve DL-WRX36 NSS dashboard monitoring)
 
 Firmware:
-OpenWrt NSS Custom Build
+AgustinLorenzo OpenWrt NSS
+
+Hardware:
+Dynalink DL-WRX36
 
 Target:
-Qualcomm IPQ807x
-Dynalink DL-WRX36
+qualcommax/ipq807x
 
 Features:
 - Qualcomm NSS acceleration
 - ECM acceleration
 - ath11k NSS offload
 - NSS qdisc
-- Custom LuCI dashboard
-
-Builder:
-Krystian
+- LuCI NSS dashboard
+- DL-WRX36 status page
