@@ -88,23 +88,6 @@ jobs:
         rm -rf openwrt/files/usr/lib/lua/luci/controller/dlwrx36.lua || true
         rm -rf openwrt/files/usr/lib/lua/luci/view/dlwrx36 || true
 
-    - name: Disable broken feeds
-      working-directory: openwrt
-      run: |
-        mkdir -p include
-        touch include/feeds.mk
-        sed -i '/nss_packages/d' include/feeds.mk || true
-        sed -i '/qosmio/d' include/feeds.mk || true
-        sed -i '/sqm_scripts_nss_julius/d' include/feeds.mk || true
-
-    - name: Debug feed sources
-      working-directory: openwrt
-      run: |
-        echo "=== FEEDS.CONF ==="
-        cat feeds.conf.default || true
-        echo "=== FIND NSS FEEDS ==="
-        grep -R "nss\|qosmio\|sqm" -n feeds.conf* package/feeds 2>/dev/null || true
-
     - name: Remove broken NSS feeds
       working-directory: openwrt
       run: |
