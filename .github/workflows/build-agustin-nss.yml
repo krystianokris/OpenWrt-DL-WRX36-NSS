@@ -1,4 +1,4 @@
-name: Build DL-WRX36 NSS Performance
+name: Build DL-WRX36 NSS
 
 on:
   workflow_dispatch:
@@ -48,65 +48,31 @@ jobs:
           file \
           ccache
 
-    - name: Restore ccache
+    - name: Cache ccache
       uses: actions/cache@v4
       with:
         path: ~/.ccache
-        key: ccache-${{ runner.os }}-${{ hashFiles('configs/dl-wrx36.config') }}
+        key: dlwrx36-ccache-${{ hashFiles('configs/dl-wrx36.config') }}
         restore-keys: |
-          ccache-${{ runner.os }}-
+          dlwrx36-ccache-
 
-    - name: Restore OpenWrt download cache
+    - name: Cache OpenWrt dl
       uses: actions/cache@v4
       with:
         path: openwrt/dl
-        key: openwrt-dl-${{ hashFiles('configs/dl-wrx36.config') }}
+        key: dlwrx36-dl-${{ hashFiles('configs/dl-wrx36.config') }}
         restore-keys: |
-          openwrt-dl-
+          dlwrx36-dl-
 
     - name: Clone Agustin NSS
       run: |
-        rm -rf openwrt
-
         git clone \
           --depth 1 \
           --branch ${{ env.OPENWRT_BRANCH }} \
           ${{ env.OPENWRT_REPO }} \
           openwrt
 
-    - name: Create build information
-      run: |
-        AGUSTIN_REV=$(cd openwrt && git rev-parse --short HEAD)
-        mkdir -p files/etc
-        cat > files/etc/dl-wrx36-nss-build <<EOF
-        DL-WRX36 NSS Performance Edition
-
-        Build:
-        $(date -u +"%Y-%m-%d %H:%M UTC")
-
-        Firmware:
-        AgustinLorenzo OpenWrt NSS
-
-        Branch:
-        $OPENWRT_BRANCH
-
-        Revision:
-        $AGUSTIN_REV
-
-        Target:
-        qualcommax/ipq807x Dynalink DL-WRX36
-
-        Features:
-        - Qualcomm NSS acceleration
-        - ECM acceleration
-        - ath11k NSS offload
-        - NSS dashboard
-        - ECM dashboard
-        - OpenWrt 2020 theme
-        - IRQ tuning
-        EOF
-
-    - name: Copy config
+    - name: Apply config
       run: |
         cp configs/dl-wrx36.config openwrt/.config
 
@@ -115,33 +81,19 @@ jobs:
         mkdir -p openwrt/files
         cp -a files/. openwrt/files/
 
-    - name: Clean runtime apk feeds
+    - name: Remove old Lua LuCI files
       run: |
+        rm -rf openwrt/files/usr/lib/lua/luci/controller/dlwrx36.lua || true
+        rm -rf openwrt/files/usr/lib/lua/luci/view/dlwrx36 || true
 
-        mkdir -p openwrt/files/etc/apk/repositories.d
-
-        cat > openwrt/files/etc/apk/repositories.d/customfeeds.list <<EOF
-        # Runtime custom feeds disabled
-        # NSS/Qosmio/Julius packages included in firmware
-        EOF
-
-    - name: Fix APK repositories
+    - name: Disable broken feeds
+      working-directory: openwrt
       run: |
-        mkdir -p openwrt/files/etc/apk/repositories.d
-
-        cat > openwrt/files/etc/apk/repositories.d/customfeeds.list <<EOF
-        https://downloads.openwrt.org/snapshots/packages/aarch64_cortex-a53/base/packages.adb
-        https://downloads.openwrt.org/snapshots/packages/aarch64_cortex-a53/luci/packages.adb
-        https://downloads.openwrt.org/snapshots/packages/aarch64_cortex-a53/packages/packages.adb
-        https://downloads.openwrt.org/snapshots/packages/aarch64_cortex-a53/routing/packages.adb
-        EOF
-
-    - name: Verify custom files
-      run: |
-        test -f openwrt/files/usr/libexec/rpcd/luci.nss-dashboard || true
-        test -f openwrt/files/usr/libexec/rpcd/luci.nss-status || true
-        test -f openwrt/files/usr/libexec/rpcd/luci.ecm-status || true
-        echo "Custom files check completed"
+        mkdir -p include
+        touch include/feeds.mk
+        sed -i '/nss_packages/d' include/feeds.mk || true
+        sed -i '/qosmio/d' include/feeds.mk || true
+        sed -i '/sqm_scripts_nss_julius/d' include/feeds.mk || true
 
     - name: Update feeds
       working-directory: openwrt
@@ -155,14 +107,12 @@ jobs:
         make defconfig
         ./scripts/diffconfig.sh > ../diffconfig.txt
 
-    - name: Remove broken apk feeds
-      working-directory: openwrt
+    - name: Verify LuCI files
       run: |
-
-        sed -i '/nss-wifi-unified/d' include/feeds.mk
-        sed -i '/nss_packages/d' include/feeds.mk
-        sed -i '/qosmio/d' include/feeds.mk
-        sed -i '/sqm_scripts_nss_julius/d' include/feeds.mk
+        echo "Checking DL-WRX36 dashboard"
+        test -f files/www/luci-static/resources/view/dlwrx36/nss.js
+        test -f files/usr/libexec/rpcd/luci.nss-dashboard
+        echo "OK"
 
     - name: Download sources
       working-directory: openwrt
@@ -186,30 +136,29 @@ jobs:
         cp diffconfig.txt artifacts/ || true
         cp files/etc/dl-wrx36-nss-build artifacts/ || true
 
-    - name: Upload firmware artifacts
+    - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: DL-WRX36-NSS-${{ github.run_number }}
         path: artifacts/
 
-    - name: Create Release
+    - name: Release
       uses: softprops/action-gh-release@v2
       if: success()
       with:
         tag_name: dl-wrx36-${{ github.run_number }}
-        name: DL-WRX36 NSS Performance Build ${{ github.run_number }}
+        name: DL-WRX36 NSS Build ${{ github.run_number }}
         body: |
-          DL-WRX36 NSS Performance Edition
-
-          Target:
-          qualcommax/ipq807x Dynalink DL-WRX36
+          DL-WRX36 NSS Build
 
           Features:
           - Qualcomm NSS acceleration
-          - ECM
-          - ath11k NSS
-          - LuCI dashboard
+          - ECM acceleration
+          - ath11k NSS offload
+          - NSS qdisc
+          - ECM dashboard
+          - NSS dashboard
+          - Native LuCI JS interface
         files: artifacts/*
-        generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
