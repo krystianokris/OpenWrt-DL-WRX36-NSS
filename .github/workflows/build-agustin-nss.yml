@@ -73,26 +73,15 @@ jobs:
           ${{ env.OPENWRT_REPO }} \
           openwrt
 
-    - name: Fix missing kernel default
+    - name: Remove incompatible NSS DSCP patch
       working-directory: openwrt
       run: |
         PATCH=target/linux/qualcommax/patches-6.12/0600-6-qca-nss-ecm-support-netfilter-DSCPREMARK.patch
         if [ -f "$PATCH" ]; then
-          echo "Checking $PATCH"
-          if grep -q "config NF_CONNTRACK_DSCPREMARK_EXT" "$PATCH"; then
-            if ! grep -q "default y" "$PATCH"; then
-              echo "Adding default y"
-              sed -i "/depends on NETFILTER_ADVANCED/a\        default y" "$PATCH"
-            else
-              echo "default y already exists"
-            fi
-            echo "=== Result ==="
-            sed -n '/config NF_CONNTRACK_DSCPREMARK_EXT/,/help/p' "$PATCH"
-          else
-            echo "Config option not found"
-          fi
+          rm -f "$PATCH"
+          echo "Removed incompatible DSCPREMARK patch: $PATCH"
         else
-          echo "Patch not found, skipping"
+          echo "Patch not found (maybe already fixed upstream), skipping"
         fi
 
     - name: Apply config
@@ -157,6 +146,11 @@ jobs:
         export PATH="/usr/lib/ccache:$PATH"
         ccache -M 10G
         make -j$(nproc) V=s
+
+    - name: Show rejected patch hunks on failure
+      if: failure()
+      run: |
+        find openwrt -name "*.rej" -print -exec cat {} \;
 
     - name: Prepare artifacts
       run: |
