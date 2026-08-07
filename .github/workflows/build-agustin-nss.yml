@@ -86,7 +86,8 @@ jobs:
       run: |
         for PATCH in \
           target/linux/qualcommax/patches-6.12/0600-6-qca-nss-ecm-support-netfilter-DSCPREMARK.patch \
-          target/linux/qualcommax/patches-6.12/0603-5-qca-nss-clients-add-vxlan-support.patch
+          target/linux/qualcommax/patches-6.12/0603-5-qca-nss-clients-add-vxlan-support.patch \
+          target/linux/qualcommax/patches-6.12/0607-2-qca-nss-clients-add-ipsec-support.patch
         do
           if [ -f "$PATCH" ]; then
             rm -f "$PATCH"
@@ -205,6 +206,7 @@ jobs:
           - Native LuCI JS interface
 
           Pinned source commit: ${{ env.OPENWRT_PINNED_COMMIT }} (AgustinLorenzo/openwrt, main_nss)
+          Removed incompatible patches: DSCPREMARK, VXLAN, IPsec (kernel 6.12.94 API mismatch)
         files: artifacts/*
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
