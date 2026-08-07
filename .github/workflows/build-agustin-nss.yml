@@ -7,8 +7,8 @@ permissions:
   contents: write
 
 env:
-  OPENWRT_REPO: https://github.com/AgustinLorenzo/openwrt.git
-  OPENWRT_BRANCH: main_nss
+  OPENWRT_REPO: https://github.com/krystianokris/openwrt.git
+  OPENWRT_BRANCH: dl-wrx36-nss
   TARGET: qualcommax/ipq807x
 
 jobs:
