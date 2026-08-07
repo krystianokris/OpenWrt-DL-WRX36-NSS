@@ -9,6 +9,7 @@ permissions:
 env:
   OPENWRT_REPO: https://github.com/AgustinLorenzo/openwrt.git
   OPENWRT_BRANCH: main_nss
+  OPENWRT_PINNED_COMMIT: 940f05be85ca740d0dc224cdac6fe2351fda3124
   TARGET: qualcommax/ipq807x
 
 jobs:
@@ -56,22 +57,6 @@ jobs:
         restore-keys: |
           dlwrx36-ccache-
 
-    - name: Clone Agustin NSS
-      run: |
-        rm -rf openwrt
-
-        git clone --depth 1 \
-          --branch ${{ env.OPENWRT_BRANCH }} \
-          ${{ env.OPENWRT_REPO }} \
-          openwrt
-
-        rm -rf openwrt/dl
-
-        cd openwrt
-        echo "Current commit:"
-        git rev-parse HEAD
-        git log --oneline -5
-
     - name: Cache OpenWrt dl
       uses: actions/cache@v4
       with:
@@ -79,6 +64,27 @@ jobs:
         key: dlwrx36-dl-${{ hashFiles('configs/dl-wrx36.config') }}
         restore-keys: |
           dlwrx36-dl-
+
+    - name: Clone Agustin NSS
+      run: |
+        rm -rf openwrt
+
+        git clone \
+          --branch ${{ env.OPENWRT_BRANCH }} \
+          ${{ env.OPENWRT_REPO }} \
+          openwrt
+
+        cd openwrt
+        git checkout ${{ env.OPENWRT_PINNED_COMMIT }}
+        
+        echo "Current commit:"
+        git rev-parse HEAD
+        git log --oneline -5
+
+    - name: Save pinned commit
+      working-directory: openwrt
+      run: |
+        git rev-parse HEAD > ../pinned-commit.txt
 
     - name: Apply config
       run: |
@@ -157,6 +163,7 @@ jobs:
         cp openwrt/bin/targets/${{ env.TARGET }}/*factory* artifacts/ || true
         cp diffconfig.txt artifacts/ || true
         cp files/etc/dl-wrx36-nss-build artifacts/ || true
+        cp pinned-commit.txt artifacts/ || true
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
@@ -182,7 +189,7 @@ jobs:
           - NSS dashboard
           - Native LuCI JS interface
 
-          Source: AgustinLorenzo/openwrt (branch: main_nss)
+          Pinned source commit: ${{ env.OPENWRT_PINNED_COMMIT }} (AgustinLorenzo/openwrt, main_nss)
         files: artifacts/*
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
