@@ -79,8 +79,8 @@ jobs:
         echo "=== Available commits ==="
         git log --oneline -10
 
-        echo "=== Checkout previous commit ==="
-        git checkout HEAD~1
+        echo "=== Checkout HEAD~4 test ==="
+        git checkout HEAD~4
 
         echo "=== Using commit ==="
         git rev-parse --short HEAD
