@@ -100,19 +100,6 @@ jobs:
         rm -rf openwrt/files/usr/lib/lua/luci/controller/dlwrx36.lua || true
         rm -rf openwrt/files/usr/lib/lua/luci/view/dlwrx36 || true
 
-    - name: Remove broken NSS feeds
-      working-directory: openwrt
-      run: |
-        echo "Removing broken runtime feeds"
-
-        sed -i '/nss_packages/d' feeds.conf.default
-        sed -i '/sqm_scripts_nss_julius/d' feeds.conf.default
-        sed -i '/qosmio/d' feeds.conf.default
-        sed -i '/nss-wifi-unified/d' feeds.conf.default
-
-        echo "=== Remaining feeds ==="
-        cat feeds.conf.default
-
     - name: Update feeds
       working-directory: openwrt
       run: |
