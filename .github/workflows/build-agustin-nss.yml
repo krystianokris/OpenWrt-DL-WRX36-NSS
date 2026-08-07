@@ -68,15 +68,12 @@ jobs:
     - name: Clone Agustin NSS (pinned to known-good commit)
       run: |
         rm -rf openwrt
-
-        git clone \
-          --branch ${{ env.OPENWRT_BRANCH }} \
-          --depth 50 \
-          ${{ env.OPENWRT_REPO }} \
-          openwrt
-
+        mkdir openwrt
         cd openwrt
-        git checkout ${{ env.OPENWRT_PINNED_COMMIT }}
+        git init -q
+        git remote add origin ${{ env.OPENWRT_REPO }}
+        git fetch --depth 1 origin ${{ env.OPENWRT_PINNED_COMMIT }}
+        git checkout FETCH_HEAD
 
         echo "=== Using commit ==="
         git rev-parse --short HEAD | tee ../pinned-commit.txt
