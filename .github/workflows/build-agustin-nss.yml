@@ -65,18 +65,16 @@ jobs:
         restore-keys: |
           dlwrx36-dl-
 
-    - name: Clone Agustin NSS (pinned to known-good commit)
+    - name: Clone Agustin NSS
       run: |
-        rm -rf openwrt
-        mkdir openwrt
-        cd openwrt
-        git init -q
-        git remote add origin ${{ env.OPENWRT_REPO }}
-        git fetch --depth 1 origin ${{ env.OPENWRT_PINNED_COMMIT }}
-        git checkout FETCH_HEAD
+        git clone --depth 1 \
+          --branch ${{ env.OPENWRT_BRANCH }} \
+          ${{ env.OPENWRT_REPO }} \
+          openwrt
 
-        echo "=== Using commit ==="
-        git rev-parse --short HEAD | tee ../pinned-commit.txt
+        cd openwrt
+        git rev-parse HEAD
+        git log --oneline -5
 
     - name: Apply config
       run: |
