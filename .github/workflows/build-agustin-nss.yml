@@ -9,6 +9,7 @@ permissions:
 env:
   OPENWRT_REPO: https://github.com/AgustinLorenzo/openwrt.git
   OPENWRT_BRANCH: main_nss
+  OPENWRT_PINNED_COMMIT: aa99c84
   TARGET: qualcommax/ipq807x
 
 jobs:
@@ -64,7 +65,7 @@ jobs:
         restore-keys: |
           dlwrx36-dl-
 
-    - name: Clone Agustin NSS (previous commit test)
+    - name: Clone Agustin NSS (pinned to known-good commit)
       run: |
         rm -rf openwrt
 
@@ -75,15 +76,10 @@ jobs:
           openwrt
 
         cd openwrt
-
-        echo "=== Available commits ==="
-        git log --oneline -10
-
-        echo "=== Checkout HEAD~4 test ==="
-        git checkout HEAD~4
+        git checkout ${{ env.OPENWRT_PINNED_COMMIT }}
 
         echo "=== Using commit ==="
-        git rev-parse --short HEAD
+        git rev-parse --short HEAD | tee ../pinned-commit.txt
 
     - name: Remove incompatible NSS DSCP patch
       working-directory: openwrt
@@ -173,6 +169,7 @@ jobs:
         cp openwrt/bin/targets/${{ env.TARGET }}/*factory* artifacts/ || true
         cp diffconfig.txt artifacts/ || true
         cp files/etc/dl-wrx36-nss-build artifacts/ || true
+        cp pinned-commit.txt artifacts/ || true
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
@@ -197,6 +194,8 @@ jobs:
           - ECM dashboard
           - NSS dashboard
           - Native LuCI JS interface
+
+          Pinned source commit: ${{ env.OPENWRT_PINNED_COMMIT }} (AgustinLorenzo/openwrt, main_nss)
         files: artifacts/*
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
