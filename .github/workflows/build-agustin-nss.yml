@@ -83,6 +83,13 @@ jobs:
       run: |
         git rev-parse HEAD > ../pinned-commit.txt
 
+    - name: Clean OpenWrt state
+      working-directory: openwrt
+      run: |
+        rm -rf tmp
+        rm -rf feeds
+        rm -f .config
+
     - name: Update feeds
       working-directory: openwrt
       run: |
@@ -93,7 +100,7 @@ jobs:
       working-directory: openwrt
       run: |
         cp ../configs/dl-wrx36.config .config
-        make olddefconfig
+        make defconfig
 
     - name: Apply custom files
       run: |
