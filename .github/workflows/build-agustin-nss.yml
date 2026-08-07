@@ -81,16 +81,20 @@ jobs:
         echo "=== Using commit ==="
         git rev-parse --short HEAD | tee ../pinned-commit.txt
 
-    - name: Remove incompatible NSS DSCP patch
+    - name: Remove incompatible NSS patches
       working-directory: openwrt
       run: |
-        PATCH=target/linux/qualcommax/patches-6.12/0600-6-qca-nss-ecm-support-netfilter-DSCPREMARK.patch
-        if [ -f "$PATCH" ]; then
-          rm -f "$PATCH"
-          echo "Removed incompatible DSCPREMARK patch: $PATCH"
-        else
-          echo "Patch not found, skipping"
-        fi
+        for PATCH in \
+          target/linux/qualcommax/patches-6.12/0600-6-qca-nss-ecm-support-netfilter-DSCPREMARK.patch \
+          target/linux/qualcommax/patches-6.12/0603-5-qca-nss-clients-add-vxlan-support.patch
+        do
+          if [ -f "$PATCH" ]; then
+            rm -f "$PATCH"
+            echo "Removed incompatible patch: $PATCH"
+          else
+            echo "Patch not found, skipping: $PATCH"
+          fi
+        done
 
     - name: Apply config
       run: |
@@ -147,6 +151,11 @@ jobs:
       working-directory: openwrt
       run: |
         make download -j8
+
+    - name: Fail fast on kernel patch errors
+      working-directory: openwrt
+      run: |
+        make target/linux/prepare V=s
 
     - name: Build firmware
       working-directory: openwrt
