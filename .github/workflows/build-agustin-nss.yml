@@ -64,14 +64,26 @@ jobs:
         restore-keys: |
           dlwrx36-dl-
 
-    - name: Clone Agustin NSS
+    - name: Clone Agustin NSS (previous commit test)
       run: |
         rm -rf openwrt
+
         git clone \
-          --depth 1 \
           --branch ${{ env.OPENWRT_BRANCH }} \
+          --depth 10 \
           ${{ env.OPENWRT_REPO }} \
           openwrt
+
+        cd openwrt
+
+        echo "=== Available commits ==="
+        git log --oneline -10
+
+        echo "=== Checkout previous commit ==="
+        git checkout HEAD~1
+
+        echo "=== Using commit ==="
+        git rev-parse --short HEAD
 
     - name: Remove incompatible NSS DSCP patch
       working-directory: openwrt
@@ -81,7 +93,7 @@ jobs:
           rm -f "$PATCH"
           echo "Removed incompatible DSCPREMARK patch: $PATCH"
         else
-          echo "Patch not found (maybe already fixed upstream), skipping"
+          echo "Patch not found, skipping"
         fi
 
     - name: Apply config
@@ -102,10 +114,12 @@ jobs:
       working-directory: openwrt
       run: |
         echo "Removing broken runtime feeds"
+
         sed -i '/nss_packages/d' feeds.conf.default
         sed -i '/sqm_scripts_nss_julius/d' feeds.conf.default
         sed -i '/qosmio/d' feeds.conf.default
         sed -i '/nss-wifi-unified/d' feeds.conf.default
+
         echo "=== Remaining feeds ==="
         cat feeds.conf.default
 
