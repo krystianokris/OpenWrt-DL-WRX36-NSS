@@ -9,7 +9,6 @@ permissions:
 env:
   OPENWRT_REPO: https://github.com/AgustinLorenzo/openwrt.git
   OPENWRT_BRANCH: main_nss
-  OPENWRT_PINNED_COMMIT: 2792f66
   TARGET: qualcommax/ipq807x
 
 jobs:
@@ -57,6 +56,22 @@ jobs:
         restore-keys: |
           dlwrx36-ccache-
 
+    - name: Clone Agustin NSS
+      run: |
+        rm -rf openwrt
+
+        git clone --depth 1 \
+          --branch ${{ env.OPENWRT_BRANCH }} \
+          ${{ env.OPENWRT_REPO }} \
+          openwrt
+
+        rm -rf openwrt/dl
+
+        cd openwrt
+        echo "Current commit:"
+        git rev-parse HEAD
+        git log --oneline -5
+
     - name: Cache OpenWrt dl
       uses: actions/cache@v4
       with:
@@ -64,17 +79,6 @@ jobs:
         key: dlwrx36-dl-${{ hashFiles('configs/dl-wrx36.config') }}
         restore-keys: |
           dlwrx36-dl-
-
-    - name: Clone Agustin NSS
-      run: |
-        git clone --depth 1 \
-          --branch ${{ env.OPENWRT_BRANCH }} \
-          ${{ env.OPENWRT_REPO }} \
-          openwrt
-
-        cd openwrt
-        git rev-parse HEAD
-        git log --oneline -5
 
     - name: Apply config
       run: |
@@ -153,7 +157,6 @@ jobs:
         cp openwrt/bin/targets/${{ env.TARGET }}/*factory* artifacts/ || true
         cp diffconfig.txt artifacts/ || true
         cp files/etc/dl-wrx36-nss-build artifacts/ || true
-        cp pinned-commit.txt artifacts/ || true
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
@@ -179,7 +182,7 @@ jobs:
           - NSS dashboard
           - Native LuCI JS interface
 
-          Pinned source commit: ${{ env.OPENWRT_PINNED_COMMIT }} (AgustinLorenzo/openwrt, main_nss) — last confirmed working build
+          Source: AgustinLorenzo/openwrt (branch: main_nss)
         files: artifacts/*
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
