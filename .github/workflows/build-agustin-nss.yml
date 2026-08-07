@@ -9,7 +9,6 @@ permissions:
 env:
   OPENWRT_REPO: https://github.com/AgustinLorenzo/openwrt.git
   OPENWRT_BRANCH: main_nss
-  OPENWRT_PINNED_COMMIT: 940f05be85ca740d0dc224cdac6fe2351fda3124
   TARGET: qualcommax/ipq807x
 
 jobs:
@@ -75,8 +74,6 @@ jobs:
           openwrt
 
         cd openwrt
-        git checkout ${{ env.OPENWRT_PINNED_COMMIT }}
-        
         echo "Current commit:"
         git rev-parse HEAD
         git log --oneline -5
@@ -86,9 +83,17 @@ jobs:
       run: |
         git rev-parse HEAD > ../pinned-commit.txt
 
-    - name: Apply config
+    - name: Update feeds
+      working-directory: openwrt
       run: |
-        cp configs/dl-wrx36.config openwrt/.config
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
+
+    - name: Import NSS config
+      working-directory: openwrt
+      run: |
+        cp ../configs/dl-wrx36.config .config
+        make olddefconfig
 
     - name: Apply custom files
       run: |
@@ -100,17 +105,9 @@ jobs:
         rm -rf openwrt/files/usr/lib/lua/luci/controller/dlwrx36.lua || true
         rm -rf openwrt/files/usr/lib/lua/luci/view/dlwrx36 || true
 
-    - name: Update feeds
-      working-directory: openwrt
-      run: |
-        ./scripts/feeds update -a
-        ./scripts/feeds install -a
-
     - name: Configure OpenWrt
       working-directory: openwrt
       run: |
-        make defconfig
-        yes "" | make olddefconfig
         ./scripts/diffconfig.sh > ../diffconfig.txt
 
     - name: Verify LuCI files
@@ -123,12 +120,19 @@ jobs:
     - name: Download sources
       working-directory: openwrt
       run: |
-        make download -j8
+        make download V=s
 
-    - name: Fail fast on kernel patch errors
+    - name: Build tools
       working-directory: openwrt
       run: |
-        make target/linux/prepare V=s
+        make tools/install -j$(nproc) V=s || \
+        make tools/install V=s
+
+    - name: Build toolchain
+      working-directory: openwrt
+      run: |
+        make toolchain/install -j$(nproc) V=s || \
+        make toolchain/install V=s
 
     - name: Build firmware
       working-directory: openwrt
@@ -137,7 +141,8 @@ jobs:
       run: |
         export PATH="/usr/lib/ccache:$PATH"
         ccache -M 10G
-        make -j$(nproc) V=s
+        make -j$(nproc) V=s || \
+        make V=s
 
     - name: Show rejected patch hunks on failure
       if: failure()
@@ -177,7 +182,7 @@ jobs:
           - NSS dashboard
           - Native LuCI JS interface
 
-          Pinned source commit: ${{ env.OPENWRT_PINNED_COMMIT }} (AgustinLorenzo/openwrt, main_nss)
+          Source: AgustinLorenzo/openwrt (branch: main_nss)
         files: artifacts/*
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
