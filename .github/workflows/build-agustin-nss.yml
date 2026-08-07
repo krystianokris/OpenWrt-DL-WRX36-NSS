@@ -9,7 +9,7 @@ permissions:
 env:
   OPENWRT_REPO: https://github.com/AgustinLorenzo/openwrt.git
   OPENWRT_BRANCH: main_nss
-  OPENWRT_PINNED_COMMIT: aa99c84
+  OPENWRT_PINNED_COMMIT: 2792f66
   TARGET: qualcommax/ipq807x
 
 jobs:
@@ -71,7 +71,7 @@ jobs:
 
         git clone \
           --branch ${{ env.OPENWRT_BRANCH }} \
-          --depth 10 \
+          --depth 50 \
           ${{ env.OPENWRT_REPO }} \
           openwrt
 
@@ -80,22 +80,6 @@ jobs:
 
         echo "=== Using commit ==="
         git rev-parse --short HEAD | tee ../pinned-commit.txt
-
-    - name: Remove incompatible NSS patches
-      working-directory: openwrt
-      run: |
-        for PATCH in \
-          target/linux/qualcommax/patches-6.12/0600-6-qca-nss-ecm-support-netfilter-DSCPREMARK.patch \
-          target/linux/qualcommax/patches-6.12/0603-5-qca-nss-clients-add-vxlan-support.patch \
-          target/linux/qualcommax/patches-6.12/0607-2-qca-nss-clients-add-ipsec-support.patch
-        do
-          if [ -f "$PATCH" ]; then
-            rm -f "$PATCH"
-            echo "Removed incompatible patch: $PATCH"
-          else
-            echo "Patch not found, skipping: $PATCH"
-          fi
-        done
 
     - name: Apply config
       run: |
@@ -135,11 +119,6 @@ jobs:
       run: |
         make defconfig
         ./scripts/diffconfig.sh > ../diffconfig.txt
-
-    - name: Check kernel config
-      working-directory: openwrt
-      run: |
-        grep NF_CONNTRACK_DSCPREMARK_EXT .config || true
 
     - name: Verify LuCI files
       run: |
@@ -205,8 +184,7 @@ jobs:
           - NSS dashboard
           - Native LuCI JS interface
 
-          Pinned source commit: ${{ env.OPENWRT_PINNED_COMMIT }} (AgustinLorenzo/openwrt, main_nss)
-          Removed incompatible patches: DSCPREMARK, VXLAN, IPsec (kernel 6.12.94 API mismatch)
+          Pinned source commit: ${{ env.OPENWRT_PINNED_COMMIT }} (AgustinLorenzo/openwrt, main_nss) — last confirmed working build
         files: artifacts/*
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
