@@ -123,6 +123,7 @@ jobs:
       working-directory: openwrt
       run: |
         make defconfig
+        yes "" | make olddefconfig
         ./scripts/diffconfig.sh > ../diffconfig.txt
 
     - name: Verify LuCI files
