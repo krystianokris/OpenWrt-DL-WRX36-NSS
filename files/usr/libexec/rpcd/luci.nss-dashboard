@@ -11,7 +11,7 @@ read_file() {
 case "$1" in
 list)
 	cat <<'JSON'
-{"read":{"read":true}}
+{"read":{}}
 JSON
 	;;
 
