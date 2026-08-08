@@ -106,7 +106,6 @@ jobs:
         ( \
           echo '# This file is auto-generated and build-specific, any changes will be intentionally lost in sysupgrade.'; \
           echo '# Add your custom feeds to /etc/apk/repositories.d/customfeeds.list'; \
-          echo 'https://openwrtdata.agustinls.com/nss-wifi-unified/$(shell date +"%Y%m%d")/packages/packages.adb'; \
           echo '%U/packages/%A/base/packages.adb'; \
           $(if $(CONFIG_BUILDBOT), \
                 echo '%U/targets/%S/kmods/$(LINUX_VERSION)-$(LINUX_RELEASE)-$(LINUX_VERMAGIC)/packages.adb';) \
@@ -119,7 +118,7 @@ jobs:
         p.write_text(s[:start] + new_block + s[end:])
         PY
 
-        echo "===== PATCHED FeedSourcesAppendAPK ====="
+        echo "===== FINAL APK FEED GENERATOR ====="
         sed -n '/define FeedSourcesAppendAPK/,/endef/p' include/feeds.mk
 
 
