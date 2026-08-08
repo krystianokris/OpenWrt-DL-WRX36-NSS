@@ -90,6 +90,39 @@ jobs:
         rm -rf feeds
         rm -f .config
 
+    - name: Patch APK feed generation
+      working-directory: openwrt
+      run: |
+        python3 - <<'PY'
+        from pathlib import Path
+
+        p = Path("include/feeds.mk")
+        s = p.read_text()
+
+        start = s.index("define FeedSourcesAppendAPK")
+        end = s.index("endef", start) + len("endef")
+
+        new_block = r'''define FeedSourcesAppendAPK
+        ( \
+          echo '# This file is auto-generated and build-specific, any changes will be intentionally lost in sysupgrade.'; \
+          echo '# Add your custom feeds to /etc/apk/repositories.d/customfeeds.list'; \
+          echo 'https://openwrtdata.agustinls.com/nss-wifi-unified/$(shell date +"%Y%m%d")/packages/packages.adb'; \
+          echo '%U/packages/%A/base/packages.adb'; \
+          $(if $(CONFIG_BUILDBOT), \
+                echo '%U/targets/%S/kmods/$(LINUX_VERSION)-$(LINUX_RELEASE)-$(LINUX_VERMAGIC)/packages.adb';) \
+          $(foreach feed,$(FEEDS_AVAILABLE), \
+                $(if $(CONFIG_FEED_$(feed)), \
+                        echo '%U/packages/%A/$(feed)/packages.adb';)) \
+        ) >> $(1)
+        endef'''
+
+        p.write_text(s[:start] + new_block + s[end:])
+        PY
+
+        echo "===== PATCHED FeedSourcesAppendAPK ====="
+        sed -n '/define FeedSourcesAppendAPK/,/endef/p' include/feeds.mk
+
+
     - name: Update feeds
       working-directory: openwrt
       run: |
