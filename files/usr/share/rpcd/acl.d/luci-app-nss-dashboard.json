@@ -4,14 +4,7 @@
         "read": {
             "ubus": {
                 "luci.nss-dashboard": [
-                    "*"
-                ]
-            }
-        },
-        "write": {
-            "ubus": {
-                "luci.nss-dashboard": [
-                    "*"
+                    "read"
                 ]
             }
         }

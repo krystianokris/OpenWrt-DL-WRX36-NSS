@@ -1,0 +1,9 @@
+#!/bin/sh
+
+chmod 755 /usr/libexec/rpcd/luci.nss-dashboard
+
+[ -f /usr/share/rpcd/acl.d/luci-app-nss-dashboard.json ] || exit 0
+
+/etc/init.d/rpcd restart 2>/dev/null || true
+
+exit 0
