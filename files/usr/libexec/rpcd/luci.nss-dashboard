@@ -46,6 +46,24 @@ call)
                 tcp6="$(num_file /sys/kernel/debug/ecm/ecm_nss_ipv6/tcp_accelerated_count)"
                 udp6="$(num_file /sys/kernel/debug/ecm/ecm_nss_ipv6/udp_accelerated_count)"
                 pending6="$(num_file /sys/kernel/debug/ecm/ecm_nss_ipv6/pending_accel_count)"
+                pending_decel="$(num_file /sys/kernel/debug/ecm/ecm_nss_ipv4/pending_decel_count)"
+                pending_decel6="$(num_file /sys/kernel/debug/ecm/ecm_nss_ipv6/pending_decel_count)"
+
+                exceptions4="$(num_file /sys/kernel/debug/ecm/stats/ecm_v4_exception_stats)"
+                exceptions6="$(num_file /sys/kernel/debug/ecm/stats/ecm_v6_exception_stats)"
+
+                iface_state() {
+                        ip link show "$1" 2>/dev/null |
+                                grep -q 'state UP' && printf 'UP' || printf 'DOWN'
+                }
+
+                lan1="$(iface_state lan1)"
+                lan2="$(iface_state lan2)"
+                lan3="$(iface_state lan3)"
+                lan4="$(iface_state lan4)"
+                brlan="$(iface_state br-lan)"
+                phy0="$(iface_state phy0-ap0)"
+                phy1="$(iface_state phy1-ap0)"
 
                 connections="$(num_file /sys/kernel/debug/ecm/ecm_db/connection_count)"
                 hosts="$(num_file /sys/kernel/debug/ecm/ecm_db/host_count)"
@@ -112,7 +130,7 @@ call)
                         health="WARNING"
                 fi
 
-                printf '{"cpu_load":"%s","memory":"%s","uptime":"%s","build":"%s","ath11k_nss":"%s","nss_modules":"%s","ecm_ipv4":"%s","ecm_tcp":"%s","ecm_udp":"%s","ecm_pending":"%s","ecm_ipv6":"%s","ecm_tcp6":"%s","ecm_udp6":"%s","ecm_pending6":"%s","ecm_connections":"%s","ecm_hosts":"%s","ecm_ifaces":"%s","ecm_mappings":"%s","ecm_nodes":"%s","wifi_channel":"%s","wifi_irqs":"%s","temperature":"%s","qdisc":"%s","cpu_freq":"%s","wan_link":"%s","pppoe_status":"%s","wan_ipv4":"%s","wan_ipv6":"%s","wan_vlan":"%s","health":"%s","nss_drv":"%s","nss_dp":"%s","ecm_health":"%s"}\n' \
+                printf '{"cpu_load":"%s","memory":"%s","uptime":"%s","build":"%s","ath11k_nss":"%s","nss_modules":"%s","ecm_ipv4":"%s","ecm_tcp":"%s","ecm_udp":"%s","ecm_pending":"%s","ecm_ipv6":"%s","ecm_tcp6":"%s","ecm_udp6":"%s","ecm_pending6":"%s","ecm_pending_decel":"%s","ecm_pending_decel6":"%s","ecm_exceptions4":"%s","ecm_exceptions6":"%s","ecm_connections":"%s","ecm_hosts":"%s","ecm_ifaces":"%s","ecm_mappings":"%s","ecm_nodes":"%s","lan1":"%s","lan2":"%s","lan3":"%s","lan4":"%s","br_lan":"%s","phy0":"%s","phy1":"%s","wifi_channel":"%s","wifi_irqs":"%s","temperature":"%s","qdisc":"%s","cpu_freq":"%s","wan_link":"%s","pppoe_status":"%s","wan_ipv4":"%s","wan_ipv6":"%s","wan_vlan":"%s","health":"%s","nss_drv":"%s","nss_dp":"%s","ecm_health":"%s"}\n' \
                 "$(value "$load")" \
                 "$(value "$memory")" \
                 "$(value "$uptime")" \
@@ -127,11 +145,22 @@ call)
                 "$tcp6" \
                 "$udp6" \
                 "$pending6" \
+                "$pending_decel" \
+                "$pending_decel6" \
+                "$(value "$exceptions4")" \
+                "$(value "$exceptions6")" \
                 "$connections" \
                 "$hosts" \
                 "$ifaces" \
                 "$mappings" \
                 "$nodes" \
+                "$lan1" \
+                "$lan2" \
+                "$lan3" \
+                "$lan4" \
+                "$brlan" \
+                "$phy0" \
+                "$phy1" \
                 "$(value "$wifi")" \
                 "$irqs" \
                 "$(value "$temp")" \

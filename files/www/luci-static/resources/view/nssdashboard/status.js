@@ -176,6 +176,52 @@ return view.extend({
                                 ])
                         );
 
+                        container.appendChild(E('h3', {}, 'ECM pipeline'));
+
+                        container.appendChild(
+                                E('div', {
+                                        'style':
+                                                'display:flex;flex-wrap:wrap;' +
+                                                'gap:12px;margin-bottom:18px'
+                                }, [
+                                        card('IPv4 pending accel', d.ecm_pending),
+                                        card('IPv4 pending decel', d.ecm_pending_decel),
+                                        card('IPv6 pending accel', d.ecm_pending6),
+                                        card('IPv6 pending decel', d.ecm_pending_decel6)
+                                ])
+                        );
+
+                        container.appendChild(E('h3', {}, 'ECM exceptions'));
+
+                        container.appendChild(
+                                E('div', {
+                                        'style':
+                                                'display:flex;flex-wrap:wrap;' +
+                                                'gap:12px;margin-bottom:18px'
+                                }, [
+                                        card('IPv4 exceptions', d.ecm_exceptions4),
+                                        card('IPv6 exceptions', d.ecm_exceptions6)
+                                ])
+                        );
+
+                        container.appendChild(E('h3', {}, 'LAN / Interfaces'));
+
+                        container.appendChild(
+                                E('div', {
+                                        'style':
+                                                'display:flex;flex-wrap:wrap;' +
+                                                'gap:12px;margin-bottom:18px'
+                                }, [
+                                        card('LAN1', d.lan1, statusColor(d.lan1)),
+                                        card('LAN2', d.lan2, statusColor(d.lan2)),
+                                        card('LAN3', d.lan3, statusColor(d.lan3)),
+                                        card('LAN4', d.lan4, statusColor(d.lan4)),
+                                        card('Bridge', d.br_lan, statusColor(d.br_lan)),
+                                        card('Wi-Fi 5 GHz', d.phy0, statusColor(d.phy0)),
+                                        card('Wi-Fi 2.4 GHz', d.phy1, statusColor(d.phy1))
+                                ])
+                        );
+
                         container.appendChild(E('h3', {}, 'Wi-Fi'));
 
                         container.appendChild(
