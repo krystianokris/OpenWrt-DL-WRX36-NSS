@@ -191,18 +191,154 @@ return view.extend({
                                 ])
                         );
 
-                        container.appendChild(E('h3', {}, 'ECM exceptions'));
+                        /*
+                         * Compact ECM diagnostics.
+                         * The raw exception counters remain available
+                         * inside a collapsed details section.
+                         */
+                        function activeExceptions(text) {
+                                if (!text)
+                                        return 0;
+
+                                var matches = String(text).match(/:\s*([0-9]+)\s*$/gm);
+                                var count = 0;
+
+                                if (!matches)
+                                        return 0;
+
+                                matches.forEach(function(line) {
+                                        var m = line.match(/:\s*([0-9]+)\s*$/);
+
+                                        if (m && parseInt(m[1], 10) > 0)
+                                                count++;
+                                });
+
+                                return count;
+                        }
+
+                        function diagnosticColor(value) {
+                                return (parseInt(value, 10) || 0) === 0 ?
+                                        '#17803d' : '#b7791f';
+                        }
+
+                        container.appendChild(
+                                E('h3', {}, 'ECM Diagnostics')
+                        );
+
+                        var ipv4Active = activeExceptions(d.ecm_exceptions4);
+                        var ipv6Active = activeExceptions(d.ecm_exceptions6);
 
                         container.appendChild(
                                 E('div', {
                                         'style':
                                                 'display:flex;flex-wrap:wrap;' +
-                                                'gap:12px;margin-bottom:18px'
+                                                'gap:12px;margin-bottom:12px'
                                 }, [
-                                        card('IPv4 exceptions', d.ecm_exceptions4),
-                                        card('IPv6 exceptions', d.ecm_exceptions6)
+                                        card(
+                                                'IPv4 active exceptions',
+                                                ipv4Active,
+                                                diagnosticColor(ipv4Active)
+                                        ),
+                                        card(
+                                                'IPv6 active exceptions',
+                                                ipv6Active,
+                                                diagnosticColor(ipv6Active)
+                                        ),
+                                        card(
+                                                'Pending acceleration',
+                                                (parseInt(d.ecm_pending, 10) || 0) +
+                                                (parseInt(d.ecm_pending6, 10) || 0),
+                                                diagnosticColor(
+                                                        (parseInt(d.ecm_pending, 10) || 0) +
+                                                        (parseInt(d.ecm_pending6, 10) || 0)
+                                                )
+                                        ),
+                                        card(
+                                                'Pending deceleration',
+                                                (parseInt(d.ecm_pending_decel, 10) || 0) +
+                                                (parseInt(d.ecm_pending_decel6, 10) || 0),
+                                                diagnosticColor(
+                                                        (parseInt(d.ecm_pending_decel, 10) || 0) +
+                                                        (parseInt(d.ecm_pending_decel6, 10) || 0)
+                                                )
+                                        )
                                 ])
                         );
+
+                        var details = E('details', {
+                                'style':
+                                        'margin-bottom:18px;' +
+                                        'border:1px solid #ddd;' +
+                                        'border-radius:8px;' +
+                                        'background:#fff;' +
+                                        'overflow:hidden'
+                        });
+
+                        details.appendChild(
+                                E('summary', {
+                                        'style':
+                                                'cursor:pointer;' +
+                                                'padding:12px 14px;' +
+                                                'font-weight:600;' +
+                                                'color:#444;' +
+                                                'background:#f7f7f7'
+                                }, '▶ Show detailed ECM exceptions')
+                        );
+
+                        var exceptionBox = E('div', {
+                                'style':
+                                        'padding:14px;' +
+                                        'background:#fafafa'
+                        });
+
+                        exceptionBox.appendChild(
+                                E('h4', {
+                                        'style':
+                                                'margin:4px 0 8px'
+                                }, 'IPv4 exceptions')
+                        );
+
+                        exceptionBox.appendChild(
+                                E('pre', {
+                                        'style':
+                                                'white-space:pre-wrap;' +
+                                                'word-break:break-word;' +
+                                                'font-size:12px;' +
+                                                'line-height:1.45;' +
+                                                'max-height:500px;' +
+                                                'overflow:auto;' +
+                                                'padding:12px;' +
+                                                'border:1px solid #ddd;' +
+                                                'border-radius:6px;' +
+                                                'background:#fff'
+                                }, String(d.ecm_exceptions4 || 'Unavailable'))
+                        );
+
+                        exceptionBox.appendChild(
+                                E('h4', {
+                                        'style':
+                                                'margin:18px 0 8px'
+                                }, 'IPv6 exceptions')
+                        );
+
+                        exceptionBox.appendChild(
+                                E('pre', {
+                                        'style':
+                                                'white-space:pre-wrap;' +
+                                                'word-break:break-word;' +
+                                                'font-size:12px;' +
+                                                'line-height:1.45;' +
+                                                'max-height:500px;' +
+                                                'overflow:auto;' +
+                                                'padding:12px;' +
+                                                'border:1px solid #ddd;' +
+                                                'border-radius:6px;' +
+                                                'background:#fff'
+                                }, String(d.ecm_exceptions6 || 'Unavailable'))
+                        );
+
+                        details.appendChild(exceptionBox);
+                        container.appendChild(details);
 
                         container.appendChild(E('h3', {}, 'LAN / Interfaces'));
 
