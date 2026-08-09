@@ -1,120 +1,154 @@
 #!/bin/sh
 
 value() {
-	printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
-}
-
-read_file() {
-	[ -r "$1" ] && cat "$1" 2>/dev/null || printf '0'
+        printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
 }
 
 num_file() {
-	[ -r "$1" ] && cat "$1" 2>/dev/null || printf '0'
+        [ -r "$1" ] && cat "$1" 2>/dev/null || printf '0'
 }
 
 case "$1" in
 list)
-	cat <<'JSON'
+        cat <<'JSON'
 {"read":{}}
 JSON
-	;;
+        ;;
 
 call)
-	case "$2" in
-	read)
+        case "$2" in
+        read)
 
-		load="$(cut -d ' ' -f 1-3 /proc/loadavg 2>/dev/null)"
+                load="$(cut -d ' ' -f 1-3 /proc/loadavg 2>/dev/null)"
 
-		set -- $(awk '
-		/MemTotal:/ { total=$2 }
-		/MemAvailable:/ { available=$2 }
-		END {
-			printf "%d %d", (total-available)/1024, total/1024
-		}' /proc/meminfo)
+                set -- $(awk '
+                /MemTotal:/ { total=$2 }
+                /MemAvailable:/ { available=$2 }
+                END {
+                        printf "%d %d", (total-available)/1024, total/1024
+                }' /proc/meminfo)
 
-		memory="${1:-0} MiB / ${2:-0} MiB"
+                memory="${1:-0} MiB / ${2:-0} MiB"
 
-		uptime="$(uptime 2>/dev/null | sed 's/.* up[[:space:]]*//; s/,.*//')"
+                uptime="$(uptime 2>/dev/null | sed 's/.* up[[:space:]]*//; s/,.*//')"
 
-		build="$(read_file /etc/dl-wrx36-nss-build)"
+                build="$( [ -r /etc/dl-wrx36-nss-build ] && cat /etc/dl-wrx36-nss-build 2>/dev/null || printf '0' )"
 
-		ath11k="$(read_file /sys/module/ath11k/parameters/nss_offload)"
-		[ "$ath11k" = "1" ] && ath11k="Enabled" || ath11k="Disabled"
+                ath11k="$(cat /sys/module/ath11k/parameters/nss_offload 2>/dev/null)"
+                [ "$ath11k" = "1" ] && ath11k="Enabled" || ath11k="Disabled"
 
-		ipv4="$(num_file /sys/kernel/debug/ecm/ecm_nss_ipv4/accelerated_count)"
-		tcp="$(num_file /sys/kernel/debug/ecm/ecm_nss_ipv4/tcp_accelerated_count)"
-		udp="$(num_file /sys/kernel/debug/ecm/ecm_nss_ipv4/udp_accelerated_count)"
-		pending="$(num_file /sys/kernel/debug/ecm/ecm_nss_ipv4/pending_accel_count)"
+                ipv4="$(num_file /sys/kernel/debug/ecm/ecm_nss_ipv4/accelerated_count)"
+                tcp="$(num_file /sys/kernel/debug/ecm/ecm_nss_ipv4/tcp_accelerated_count)"
+                udp="$(num_file /sys/kernel/debug/ecm/ecm_nss_ipv4/udp_accelerated_count)"
+                pending="$(num_file /sys/kernel/debug/ecm/ecm_nss_ipv4/pending_accel_count)"
 
-		ipv6="$(num_file /sys/kernel/debug/ecm/ecm_nss_ipv6/accelerated_count)"
-		tcp6="$(num_file /sys/kernel/debug/ecm/ecm_nss_ipv6/tcp_accelerated_count)"
-		udp6="$(num_file /sys/kernel/debug/ecm/ecm_nss_ipv6/udp_accelerated_count)"
-		pending6="$(num_file /sys/kernel/debug/ecm/ecm_nss_ipv6/pending_accel_count)"
+                ipv6="$(num_file /sys/kernel/debug/ecm/ecm_nss_ipv6/accelerated_count)"
+                tcp6="$(num_file /sys/kernel/debug/ecm/ecm_nss_ipv6/tcp_accelerated_count)"
+                udp6="$(num_file /sys/kernel/debug/ecm/ecm_nss_ipv6/udp_accelerated_count)"
+                pending6="$(num_file /sys/kernel/debug/ecm/ecm_nss_ipv6/pending_accel_count)"
 
-		connections="$(num_file /sys/kernel/debug/ecm/ecm_db/connection_count)"
-		hosts="$(num_file /sys/kernel/debug/ecm/ecm_db/host_count)"
-		ifaces="$(num_file /sys/kernel/debug/ecm/ecm_db/iface_count)"
-		mappings="$(num_file /sys/kernel/debug/ecm/ecm_db/mapping_count)"
-		nodes="$(num_file /sys/kernel/debug/ecm/ecm_db/node_count)"
+                connections="$(num_file /sys/kernel/debug/ecm/ecm_db/connection_count)"
+                hosts="$(num_file /sys/kernel/debug/ecm/ecm_db/host_count)"
+                ifaces="$(num_file /sys/kernel/debug/ecm/ecm_db/iface_count)"
+                mappings="$(num_file /sys/kernel/debug/ecm/ecm_db/mapping_count)"
+                nodes="$(num_file /sys/kernel/debug/ecm/ecm_db/node_count)"
 
-		modules="$(/sbin/lsmod 2>/dev/null | awk '$1 ~ /^qca_nss/ { count++ } END { print count+0 }')"
+                modules="$(/sbin/lsmod 2>/dev/null | awk '$1 ~ /^qca_nss/ { count++ } END { print count+0 }')"
 
-		temp="$(cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null)"
-		if [ -n "$temp" ]; then
-			temp="$((temp / 1000))°C"
-		else
-			temp="Unavailable"
-		fi
+                temp="$(cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null)"
+                if [ -n "$temp" ]; then
+                        temp="$((temp / 1000))°C"
+                else
+                        temp="Unavailable"
+                fi
 
-		qdisc="$(/sbin/lsmod 2>/dev/null | grep -q qca_nss_qdisc && printf 'Enabled' || printf 'Disabled')"
+                qdisc="$(/sbin/lsmod 2>/dev/null | grep -q qca_nss_qdisc && printf 'Enabled' || printf 'Disabled')"
 
-		cpu_freq="$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq 2>/dev/null)"
-		if [ -n "$cpu_freq" ]; then
-			cpu_freq="$((cpu_freq / 1000)) MHz"
-		else
-			cpu_freq="Unknown"
-		fi
+                cpu_freq="$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq 2>/dev/null)"
+                if [ -n "$cpu_freq" ]; then
+                        cpu_freq="$((cpu_freq / 1000)) MHz"
+                else
+                        cpu_freq="Unknown"
+                fi
 
-		wifi="$(iwinfo 2>/dev/null | awk '/Channel:/ {
-			sub(/^.*Channel: /,"");
-			sub(/ \|.*$/,"");
-			print;
-			exit
-		}')"
+                wifi="$(iwinfo 2>/dev/null | awk '/Channel:/ {
+                        sub(/^.*Channel: /,"");
+                        sub(/ \|.*$/,"");
+                        print;
+                        exit
+                }')"
 
-		[ -n "$wifi" ] || wifi="Unavailable"
+                [ -n "$wifi" ] || wifi="Unavailable"
 
-		irqs="$(awk '/ath11k|wlan|wifi/ { count++ } END { print count+0 }' /proc/interrupts 2>/dev/null)"
+                irqs="$(awk '/ath11k|wlan|wifi/ { count++ } END { print count+0 }' /proc/interrupts 2>/dev/null)"
 
-		printf '{"cpu_load":"%s","memory":"%s","uptime":"%s","build":"%s","ath11k_nss":"%s","nss_modules":"%s","ecm_ipv4":"%s","ecm_tcp":"%s","ecm_udp":"%s","ecm_pending":"%s","ecm_ipv6":"%s","ecm_tcp6":"%s","ecm_udp6":"%s","ecm_pending6":"%s","ecm_connections":"%s","ecm_hosts":"%s","ecm_ifaces":"%s","ecm_mappings":"%s","ecm_nodes":"%s","wifi_channel":"%s","wifi_irqs":"%s","temperature":"%s","qdisc":"%s","cpu_freq":"%s"}\n' \
-			"$(value "$load")" \
-			"$(value "$memory")" \
-			"$(value "$uptime")" \
-			"$(value "$build")" \
-			"$(value "$ath11k")" \
-			"$modules" \
-			"$ipv4" \
-			"$tcp" \
-			"$udp" \
-			"$pending" \
-			"$ipv6" \
-			"$tcp6" \
-			"$udp6" \
-			"$pending6" \
-			"$connections" \
-			"$hosts" \
-			"$ifaces" \
-			"$mappings" \
-			"$nodes" \
-			"$(value "$wifi")" \
-			"$irqs" \
-			"$(value "$temp")" \
-			"$qdisc" \
-			"$(value "$cpu_freq")"
+                # WAN / PPPoE
+                wan_link="$(ip link show wan 2>/dev/null | grep -q 'state UP' && printf 'UP' || printf 'DOWN')"
 
-	;;
+                pppoe_link="$(ip -4 addr show dev pppoe-wan 2>/dev/null | grep -q 'inet ' && printf 'Connected' || printf 'Disconnected')"
 
-	esac
-	;;
+                wan_ipv4="$(ip -4 addr show dev pppoe-wan 2>/dev/null | awk '/inet / {print $2; exit}')"
+                [ -n "$wan_ipv4" ] || wan_ipv4="Unavailable"
+
+                wan_ipv6="$(ip -6 addr show dev pppoe-wan scope global 2>/dev/null | awk '/inet6 / {print $2; exit}')"
+                [ -n "$wan_ipv6" ] || wan_ipv6="Unavailable"
+
+                vlan="$(ip link show wan.911 2>/dev/null | grep -q 'wan.911' && printf 'wan.911' || printf 'Unavailable')"
+
+                # Health
+                nss_drv="$(/sbin/lsmod 2>/dev/null | grep -q '^qca_nss_drv ' && printf 'OK' || printf 'ERROR')"
+                nss_dp="$(/sbin/lsmod 2>/dev/null | grep -q '^qca_nss_dp ' && printf 'OK' || printf 'ERROR')"
+                ecm_state="$( [ -r /sys/kernel/debug/ecm/ecm_nss_ipv4/accelerated_count ] && printf 'OK' || printf 'ERROR' )"
+                ath11k_health="$ath11k"
+                qdisc_health="$qdisc"
+
+                if [ "$nss_drv" = "OK" ] &&
+                   [ "$nss_dp" = "OK" ] &&
+                   [ "$ecm_state" = "OK" ] &&
+                   [ "$ath11k_health" = "Enabled" ] &&
+                   [ "$qdisc_health" = "Enabled" ]; then
+                        health="OK"
+                else
+                        health="WARNING"
+                fi
+
+                printf '{"cpu_load":"%s","memory":"%s","uptime":"%s","build":"%s","ath11k_nss":"%s","nss_modules":"%s","ecm_ipv4":"%s","ecm_tcp":"%s","ecm_udp":"%s","ecm_pending":"%s","ecm_ipv6":"%s","ecm_tcp6":"%s","ecm_udp6":"%s","ecm_pending6":"%s","ecm_connections":"%s","ecm_hosts":"%s","ecm_ifaces":"%s","ecm_mappings":"%s","ecm_nodes":"%s","wifi_channel":"%s","wifi_irqs":"%s","temperature":"%s","qdisc":"%s","cpu_freq":"%s","wan_link":"%s","pppoe_status":"%s","wan_ipv4":"%s","wan_ipv6":"%s","wan_vlan":"%s","health":"%s","nss_drv":"%s","nss_dp":"%s","ecm_health":"%s"}\n' \
+                "$(value "$load")" \
+                "$(value "$memory")" \
+                "$(value "$uptime")" \
+                "$(value "$build")" \
+                "$(value "$ath11k")" \
+                "$modules" \
+                "$ipv4" \
+                "$tcp" \
+                "$udp" \
+                "$pending" \
+                "$ipv6" \
+                "$tcp6" \
+                "$udp6" \
+                "$pending6" \
+                "$connections" \
+                "$hosts" \
+                "$ifaces" \
+                "$mappings" \
+                "$nodes" \
+                "$(value "$wifi")" \
+                "$irqs" \
+                "$(value "$temp")" \
+                "$qdisc" \
+                "$(value "$cpu_freq")" \
+                "$wan_link" \
+                "$pppoe_link" \
+                "$(value "$wan_ipv4")" \
+                "$(value "$wan_ipv6")" \
+                "$vlan" \
+                "$health" \
+                "$nss_drv" \
+                "$nss_dp" \
+                "$ecm_state"
+
+        ;;
+        esac
+        ;;
 
 esac

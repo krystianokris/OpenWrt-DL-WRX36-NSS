@@ -4,145 +4,203 @@
 'require rpc';
 
 var callDashboard = rpc.declare({
-	object: 'luci.nss-dashboard',
-	method: 'read',
-	expect: {}
+        object: 'luci.nss-dashboard',
+        method: 'read',
+        expect: {}
 });
 
 function card(label, value, state) {
-	return E('div', {
-		'style':
-			'flex:1 1 200px;' +
-			'padding:14px;' +
-			'border:1px solid #ddd;' +
-			'border-radius:8px;' +
-			'background:#fff;' +
-			'box-shadow:0 1px 3px rgba(0,0,0,.08)'
-	}, [
-		E('div', {
-			'style':
-				'color:#666;' +
-				'font-size:12px;' +
-				'text-transform:uppercase;' +
-				'margin-bottom:6px'
-		}, label),
+        return E('div', {
+                'style':
+                        'flex:1 1 210px;padding:14px;' +
+                        'border:1px solid #ddd;border-radius:8px;' +
+                        'background:#fff'
+        }, [
+                E('div', {
+                        'style':
+                                'color:#666;font-size:12px;' +
+                                'text-transform:uppercase;margin-bottom:6px'
+                }, label),
 
-		E('div', {
-			'style':
-				'font-size:20px;' +
-				'font-weight:600;' +
-				'color:' + (state || '#222')
-		}, String(value ?? 'Unavailable'))
-	]);
+                E('div', {
+                        'style':
+                                'font-size:18px;font-weight:600;color:' +
+                                (state || '#222')
+                }, String(value || 'Unavailable'))
+        ]);
 }
 
-function section(title, cards) {
-	return E('div', {
-		'style':'margin-bottom:24px'
-	}, [
-		E('h3', {
-			'style':'margin-bottom:12px'
-		}, title),
+function statusColor(value) {
+        if (value === 'OK' ||
+            value === 'Enabled' ||
+            value === 'UP' ||
+            value === 'Connected')
+                return '#17803d';
 
-		E('div', {
-			'style':
-				'display:flex;' +
-				'flex-wrap:wrap;' +
-				'gap:12px'
-		}, cards)
-	]);
+        if (value === 'WARNING')
+                return '#b7791f';
+
+        if (value === 'ERROR' ||
+            value === 'DOWN' ||
+            value === 'Disabled' ||
+            value === 'Disconnected')
+                return '#b33a3a';
+
+        return '#222';
 }
 
 return view.extend({
 
-	load: function() {
-		return callDashboard();
-	},
+        load: function() {
+                return callDashboard();
+        },
 
-	render: function(data) {
+        render: function(data) {
 
-		data = data || {};
+                var d = data || {};
 
-		var nssState =
-			data.ath11k_nss == 'Enabled'
-				? '#17803d'
-				: '#b33a3a';
+                var container = E('div');
 
-		var qdiscState =
-			data.qdisc == 'Enabled'
-				? '#17803d'
-				: '#b33a3a';
+                function renderDashboard(data) {
 
-		var pendingState =
-			Number(data.ecm_pending || 0) === 0
-				? '#17803d'
-				: '#b36b00';
+                        d = data || {};
 
-		return E('div', {}, [
+                        var healthColor = statusColor(d.health);
 
-			E('h2', {}, 'DL-WRX36 NSS Dashboard'),
+                        container.innerHTML = '';
 
-			E('p', {
-				'style':
-					'margin-bottom:20px;color:#666'
-			}, 'Live NSS, ECM and Wi-Fi acceleration status'),
+                        container.appendChild(
+                                E('h2', {}, 'DL-WRX36 NSS Dashboard')
+                        );
 
-			section('System', [
-				card('CPU Load', data.cpu_load),
-				card('Memory', data.memory),
-				card('Uptime', data.uptime),
-				card('Temperature', data.temperature),
-				card('CPU Frequency', data.cpu_freq),
-				card('NSS Modules', data.nss_modules)
-			]),
+                        container.appendChild(
+                                E('p', {
+                                        'style':
+                                                'margin-bottom:16px;color:#666'
+                                }, 'Live NSS, ECM, WAN and system status')
+                        );
 
-			section('NSS acceleration', [
-				card(
-					'ath11k NSS',
-					data.ath11k_nss,
-					nssState
-				),
+                        container.appendChild(E('h3', {}, 'Overall health'));
 
-				card(
-					'NSS Qdisc',
-					data.qdisc,
-					qdiscState
-				)
-			]),
+                        container.appendChild(
+                                E('div', {
+                                        'style':
+                                                'display:flex;flex-wrap:wrap;' +
+                                                'gap:12px;margin-bottom:18px'
+                                }, [
+                                        card('System health', d.health, healthColor),
+                                        card('NSS driver', d.nss_drv, statusColor(d.nss_drv)),
+                                        card('NSS datapath', d.nss_dp, statusColor(d.nss_dp)),
+                                        card('ECM', d.ecm_health, statusColor(d.ecm_health)),
+                                        card('ath11k NSS', d.ath11k_nss, statusColor(d.ath11k_nss)),
+                                        card('NSS Qdisc', d.qdisc, statusColor(d.qdisc))
+                                ])
+                        );
 
-			section('ECM IPv4 acceleration', [
-				card('IPv4 accelerated', data.ecm_ipv4),
-				card('TCP accelerated', data.ecm_tcp),
-				card('UDP accelerated', data.ecm_udp),
-				card(
-					'Pending acceleration',
-					data.ecm_pending,
-					pendingState
-				)
-			]),
+                        container.appendChild(E('h3', {}, 'WAN / PPPoE'));
 
-			section('ECM IPv6 acceleration', [
-				card('IPv6 accelerated', data.ecm_ipv6),
-				card('TCP6 accelerated', data.ecm_tcp6),
-				card('UDP6 accelerated', data.ecm_udp6),
-				card(
-					'Pending IPv6',
-					data.ecm_pending6
-				)
-			]),
+                        container.appendChild(
+                                E('div', {
+                                        'style':
+                                                'display:flex;flex-wrap:wrap;' +
+                                                'gap:12px;margin-bottom:18px'
+                                }, [
+                                        card('WAN link', d.wan_link, statusColor(d.wan_link)),
+                                        card('PPPoE', d.pppoe_status, statusColor(d.pppoe_status)),
+                                        card('WAN IPv4', d.wan_ipv4),
+                                        card('WAN IPv6', d.wan_ipv6),
+                                        card('VLAN', d.wan_vlan)
+                                ])
+                        );
 
-			section('ECM database', [
-				card('Connections', data.ecm_connections),
-				card('Hosts', data.ecm_hosts),
-				card('Interfaces', data.ecm_ifaces),
-				card('Mappings', data.ecm_mappings),
-				card('Nodes', data.ecm_nodes)
-			]),
+                        container.appendChild(E('h3', {}, 'System'));
 
-			section('Wi-Fi', [
-				card('Channel', data.wifi_channel),
-				card('Wi-Fi IRQs', data.wifi_irqs)
-			])
-		]);
-	}
+                        container.appendChild(
+                                E('div', {
+                                        'style':
+                                                'display:flex;flex-wrap:wrap;' +
+                                                'gap:12px;margin-bottom:18px'
+                                }, [
+                                        card('CPU load', d.cpu_load),
+                                        card('Memory', d.memory),
+                                        card('Uptime', d.uptime),
+                                        card('Temperature', d.temperature),
+                                        card('CPU frequency', d.cpu_freq),
+                                        card('NSS modules', d.nss_modules)
+                                ])
+                        );
+
+                        container.appendChild(E('h3', {}, 'ECM IPv4'));
+
+                        container.appendChild(
+                                E('div', {
+                                        'style':
+                                                'display:flex;flex-wrap:wrap;' +
+                                                'gap:12px;margin-bottom:18px'
+                                }, [
+                                        card('Accelerated', d.ecm_ipv4),
+                                        card('TCP', d.ecm_tcp),
+                                        card('UDP', d.ecm_udp),
+                                        card('Pending', d.ecm_pending)
+                                ])
+                        );
+
+                        container.appendChild(E('h3', {}, 'ECM IPv6'));
+
+                        container.appendChild(
+                                E('div', {
+                                        'style':
+                                                'display:flex;flex-wrap:wrap;' +
+                                                'gap:12px;margin-bottom:18px'
+                                }, [
+                                        card('Accelerated', d.ecm_ipv6),
+                                        card('TCP', d.ecm_tcp6),
+                                        card('UDP', d.ecm_udp6),
+                                        card('Pending', d.ecm_pending6)
+                                ])
+                        );
+
+                        container.appendChild(E('h3', {}, 'ECM database'));
+
+                        container.appendChild(
+                                E('div', {
+                                        'style':
+                                                'display:flex;flex-wrap:wrap;' +
+                                                'gap:12px;margin-bottom:18px'
+                                }, [
+                                        card('Connections', d.ecm_connections),
+                                        card('Hosts', d.ecm_hosts),
+                                        card('Interfaces', d.ecm_ifaces),
+                                        card('Mappings', d.ecm_mappings),
+                                        card('Nodes', d.ecm_nodes)
+                                ])
+                        );
+
+                        container.appendChild(E('h3', {}, 'Wi-Fi'));
+
+                        container.appendChild(
+                                E('div', {
+                                        'style':
+                                                'display:flex;flex-wrap:wrap;' +
+                                                'gap:12px'
+                                }, [
+                                        card('Channel', d.wifi_channel),
+                                        card('Wi-Fi IRQs', d.wifi_irqs)
+                                ])
+                        );
+                }
+
+                renderDashboard(data);
+
+                /* Auto-refresh every 10 seconds */
+                var timer = setInterval(function() {
+                        callDashboard().then(renderDashboard);
+                }, 10000);
+
+                container.addEventListener('remove', function() {
+                        clearInterval(timer);
+                });
+
+                return container;
+        }
 });
