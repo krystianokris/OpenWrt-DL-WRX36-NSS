@@ -8,6 +8,10 @@ read_file() {
 	[ -r "$1" ] && cat "$1" 2>/dev/null || printf '0'
 }
 
+num_file() {
+	[ -r "$1" ] && cat "$1" 2>/dev/null || printf '0'
+}
+
 case "$1" in
 list)
 	cat <<'JSON'
@@ -17,7 +21,6 @@ JSON
 
 call)
 	case "$2" in
-
 	read)
 
 		load="$(cut -d ' ' -f 1-3 /proc/loadavg 2>/dev/null)"
@@ -38,12 +41,23 @@ call)
 		ath11k="$(read_file /sys/module/ath11k/parameters/nss_offload)"
 		[ "$ath11k" = "1" ] && ath11k="Enabled" || ath11k="Disabled"
 
-		ipv4="$(read_file /sys/kernel/debug/ecm/ecm_nss_ipv4/accelerated_count)"
-		tcp="$(read_file /sys/kernel/debug/ecm/ecm_nss_ipv4/tcp_accelerated_count)"
-		udp="$(read_file /sys/kernel/debug/ecm/ecm_nss_ipv4/udp_accelerated_count)"
-		pending="$(read_file /sys/kernel/debug/ecm/ecm_nss_ipv4/pending_accel_count)"
+		ipv4="$(num_file /sys/kernel/debug/ecm/ecm_nss_ipv4/accelerated_count)"
+		tcp="$(num_file /sys/kernel/debug/ecm/ecm_nss_ipv4/tcp_accelerated_count)"
+		udp="$(num_file /sys/kernel/debug/ecm/ecm_nss_ipv4/udp_accelerated_count)"
+		pending="$(num_file /sys/kernel/debug/ecm/ecm_nss_ipv4/pending_accel_count)"
 
-		modules="$(lsmod 2>/dev/null | awk '$1 ~ /^qca_nss/ { count++ } END { print count+0 }')"
+		ipv6="$(num_file /sys/kernel/debug/ecm/ecm_nss_ipv6/accelerated_count)"
+		tcp6="$(num_file /sys/kernel/debug/ecm/ecm_nss_ipv6/tcp_accelerated_count)"
+		udp6="$(num_file /sys/kernel/debug/ecm/ecm_nss_ipv6/udp_accelerated_count)"
+		pending6="$(num_file /sys/kernel/debug/ecm/ecm_nss_ipv6/pending_accel_count)"
+
+		connections="$(num_file /sys/kernel/debug/ecm/ecm_db/connection_count)"
+		hosts="$(num_file /sys/kernel/debug/ecm/ecm_db/host_count)"
+		ifaces="$(num_file /sys/kernel/debug/ecm/ecm_db/iface_count)"
+		mappings="$(num_file /sys/kernel/debug/ecm/ecm_db/mapping_count)"
+		nodes="$(num_file /sys/kernel/debug/ecm/ecm_db/node_count)"
+
+		modules="$(/sbin/lsmod 2>/dev/null | awk '$1 ~ /^qca_nss/ { count++ } END { print count+0 }')"
 
 		temp="$(cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null)"
 		if [ -n "$temp" ]; then
@@ -52,7 +66,7 @@ call)
 			temp="Unavailable"
 		fi
 
-		qdisc="$(lsmod 2>/dev/null | grep -q qca_nss_qdisc && printf 'Enabled' || printf 'Disabled')"
+		qdisc="$(/sbin/lsmod 2>/dev/null | grep -q qca_nss_qdisc && printf 'Enabled' || printf 'Disabled')"
 
 		cpu_freq="$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq 2>/dev/null)"
 		if [ -n "$cpu_freq" ]; then
@@ -72,23 +86,31 @@ call)
 
 		irqs="$(awk '/ath11k|wlan|wifi/ { count++ } END { print count+0 }' /proc/interrupts 2>/dev/null)"
 
-		printf '{"cpu_load":"%s","memory":"%s","uptime":"%s","build":"%s","ath11k_nss":"%s","nss_modules":"%s","ecm_ipv4":"%s","ecm_tcp":"%s","ecm_udp":"%s","ecm_total":"%s","ecm_pending":"%s","wifi_channel":"%s","wifi_irqs":"%s","temperature":"%s","qdisc":"%s","cpu_freq":"%s"}\n' \
-		"$(value "$load")" \
-		"$(value "$memory")" \
-		"$(value "$uptime")" \
-		"$(value "$build")" \
-		"$(value "$ath11k")" \
-		"$modules" \
-		"$ipv4" \
-		"$tcp" \
-		"$udp" \
-		"$ipv4" \
-		"$pending" \
-		"$(value "$wifi")" \
-		"$irqs" \
-		"$(value "$temp")" \
-		"$qdisc" \
-		"$(value "$cpu_freq")"
+		printf '{"cpu_load":"%s","memory":"%s","uptime":"%s","build":"%s","ath11k_nss":"%s","nss_modules":"%s","ecm_ipv4":"%s","ecm_tcp":"%s","ecm_udp":"%s","ecm_pending":"%s","ecm_ipv6":"%s","ecm_tcp6":"%s","ecm_udp6":"%s","ecm_pending6":"%s","ecm_connections":"%s","ecm_hosts":"%s","ecm_ifaces":"%s","ecm_mappings":"%s","ecm_nodes":"%s","wifi_channel":"%s","wifi_irqs":"%s","temperature":"%s","qdisc":"%s","cpu_freq":"%s"}\n' \
+			"$(value "$load")" \
+			"$(value "$memory")" \
+			"$(value "$uptime")" \
+			"$(value "$build")" \
+			"$(value "$ath11k")" \
+			"$modules" \
+			"$ipv4" \
+			"$tcp" \
+			"$udp" \
+			"$pending" \
+			"$ipv6" \
+			"$tcp6" \
+			"$udp6" \
+			"$pending6" \
+			"$connections" \
+			"$hosts" \
+			"$ifaces" \
+			"$mappings" \
+			"$nodes" \
+			"$(value "$wifi")" \
+			"$irqs" \
+			"$(value "$temp")" \
+			"$qdisc" \
+			"$(value "$cpu_freq")"
 
 	;;
 
