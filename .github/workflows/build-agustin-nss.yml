@@ -134,6 +134,26 @@ jobs:
         cp ../configs/dl-wrx36.config .config
         make defconfig
 
+        echo "===== FINAL WPA / MESH CONFIG ====="
+        grep -E '^CONFIG_PACKAGE_(wpad|hostapd|wpa-supplicant)' .config || true
+
+        echo
+        echo "===== VERIFY MESH WPA ====="
+
+        grep -q '^CONFIG_PACKAGE_wpad-mesh-openssl=y$' .config || {
+          echo "ERROR: wpad-mesh-openssl is NOT enabled!"
+          exit 1
+        }
+
+        echo "OK: wpad-mesh-openssl enabled"
+
+        if grep -q '^CONFIG_PACKAGE_wpad-openssl=y$' .config; then
+          echo "ERROR: ordinary wpad-openssl is also selected!"
+          exit 1
+        fi
+
+        echo "OK: ordinary wpad-openssl is not selected"
+
     - name: Apply custom files
       run: |
         mkdir -p openwrt/files
@@ -172,6 +192,26 @@ jobs:
       run: |
         make toolchain/install -j$(nproc) V=s || \
         make toolchain/install V=s
+
+    - name: Verify WPA mesh package
+      working-directory: openwrt
+      run: |
+        echo "===== WPA MESH PRE-BUILD CHECK ====="
+
+        test "$(grep -c '^CONFIG_PACKAGE_wpad-mesh-openssl=y$' .config)" -eq 1 || {
+          echo "ERROR: wpad-mesh-openssl missing from final .config"
+          exit 1
+        }
+
+        echo "Selected:"
+        grep -E '^CONFIG_PACKAGE_(wpad|hostapd|wpa-supplicant)' .config
+
+        echo
+        echo "Checking package definition:"
+        grep -n -A12 -B3 'Package/wpad-mesh-openssl' package/network/services/hostapd/Makefile
+
+        echo
+        echo "WPA mesh configuration looks correct."
 
     - name: Build firmware
       working-directory: openwrt
