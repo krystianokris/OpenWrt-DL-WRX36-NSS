@@ -38,7 +38,27 @@ function color(v) {
 
 function numberColor(v) {
         return (parseInt(v, 10) || 0) === 0 ?
-                '#17803d' : '#b7791f';
+                '#17803d' : '#222';
+}
+
+function warningNumberColor(v) {
+        return (parseInt(v, 10) || 0) > 0 ?
+                '#b7791f' : '#17803d';
+}
+
+function statusBadgeStyle(v) {
+        var c = color(v);
+
+        if (c === '#17803d')
+                return 'background:#edf7f0;color:#176b35;border:1px solid #cfe8d6';
+
+        if (c === '#b33a3a')
+                return 'background:#fbeeee;color:#a12f2f;border:1px solid #f0cccc';
+
+        if (c === '#b7791f')
+                return 'background:#fff8e8;color:#986515;border:1px solid #f0dfb8';
+
+        return 'background:#f8f9fa;color:#555;border:1px solid #e2e5e8';
 }
 
 function card(label, val, state) {
@@ -46,7 +66,7 @@ function card(label, val, state) {
                 'style':
                         'flex:1 1 150px;' +
                         'min-width:140px;' +
-                        'padding:12px 14px;' +
+                        'padding:11px 13px;' +
                         'border:1px solid #e2e5e8;' +
                         'border-radius:7px;' +
                         'background:#fff;' +
@@ -64,7 +84,7 @@ function card(label, val, state) {
 
                 E('div', {
                         'style':
-                                'font-size:17px;' +
+                                'font-size:18px;' +
                                 'font-weight:600;' +
                                 'line-height:1.25;' +
                                 'color:' + (state || '#222') +
@@ -137,57 +157,56 @@ return view.extend({
                                         'style':
                                                 'display:flex;' +
                                                 'flex-wrap:wrap;' +
-                                                'gap:7px;' +
-                                                'margin-bottom:12px'
+                                                'gap:6px;' +
+                                                'margin-bottom:10px'
                                 }, [
                                         E('span', {
                                                 'style':
-                                                        'padding:5px 9px;' +
-                                                        'border-radius:5px;' +
-                                                        'font-size:12px;' +
+                                                        'padding:4px 8px;' +
+                                                        'border-radius:6px;' +
+                                                        'font-size:11px;' +
                                                         'font-weight:600;' +
-                                                        'background:#f1f3f5;' +
-                                                        'color:' + color(d.health)
+                                                        statusBadgeStyle(d.health)
                                         }, 'System: ' + value(d.health)),
 
                                         E('span', {
                                                 'style':
-                                                        'padding:5px 9px;' +
-                                                        'border-radius:5px;' +
-                                                        'font-size:12px;' +
+                                                        'padding:4px 8px;' +
+                                                        'border:1px solid #e2e5e8;' +
+                                                        'border-radius:6px;' +
+                                                        'font-size:11px;' +
                                                         'font-weight:600;' +
-                                                        'background:#f1f3f5;' +
-                                                        'color:' + color(d.nss_drv)
+                                                        statusBadgeStyle(d.nss_drv)
                                         }, 'NSS: ' + value(d.nss_drv)),
 
                                         E('span', {
                                                 'style':
-                                                        'padding:5px 9px;' +
-                                                        'border-radius:5px;' +
-                                                        'font-size:12px;' +
+                                                        'padding:4px 8px;' +
+                                                        'border:1px solid #e2e5e8;' +
+                                                        'border-radius:6px;' +
+                                                        'font-size:11px;' +
                                                         'font-weight:600;' +
-                                                        'background:#f1f3f5;' +
-                                                        'color:' + color(d.ecm_health)
+                                                        statusBadgeStyle(d.ecm_health)
                                         }, 'ECM: ' + value(d.ecm_health)),
 
                                         E('span', {
                                                 'style':
-                                                        'padding:5px 9px;' +
-                                                        'border-radius:5px;' +
-                                                        'font-size:12px;' +
+                                                        'padding:4px 8px;' +
+                                                        'border:1px solid #e2e5e8;' +
+                                                        'border-radius:6px;' +
+                                                        'font-size:11px;' +
                                                         'font-weight:600;' +
-                                                        'background:#f1f3f5;' +
-                                                        'color:' + color(d.wan_link)
+                                                        statusBadgeStyle(d.wan_link)
                                         }, 'WAN: ' + value(d.wan_link)),
 
                                         E('span', {
                                                 'style':
-                                                        'padding:5px 9px;' +
-                                                        'border-radius:5px;' +
-                                                        'font-size:12px;' +
+                                                        'padding:4px 8px;' +
+                                                        'border:1px solid #e2e5e8;' +
+                                                        'border-radius:6px;' +
+                                                        'font-size:11px;' +
                                                         'font-weight:600;' +
-                                                        'background:#f1f3f5;' +
-                                                        'color:' + color(d.pppoe_status)
+                                                        statusBadgeStyle(d.pppoe_status)
                                         }, 'PPPoE: ' + value(d.pppoe_status))
                                 ])
                         );
@@ -218,8 +237,7 @@ return view.extend({
                                         card('Datapath', d.nss_dp, color(d.nss_dp)),
                                         card('ECM', d.ecm_health, color(d.ecm_health)),
                                         card('ath11k NSS', d.ath11k_nss, color(d.ath11k_nss)),
-                                        card('NSS Qdisc', d.qdisc, color(d.qdisc)),
-                                        card('Modules', d.nss_modules)
+                                        card('NSS Qdisc', d.qdisc, color(d.qdisc))
                                 ])
                         );
 
@@ -318,12 +336,12 @@ return view.extend({
                                         card(
                                                 'IPv4 active exceptions',
                                                 ipv4Active,
-                                                numberColor(ipv4Active)
+                                                warningNumberColor(ipv4Active)
                                         ),
                                         card(
                                                 'IPv6 active exceptions',
                                                 ipv6Active,
-                                                numberColor(ipv6Active)
+                                                warningNumberColor(ipv6Active)
                                         )
                                 ], 6)
                         );
