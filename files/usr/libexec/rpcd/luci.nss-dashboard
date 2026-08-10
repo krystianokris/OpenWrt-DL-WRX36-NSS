@@ -130,7 +130,40 @@ call)
                         health="WARNING"
                 fi
 
-                printf '{"cpu_load":"%s","memory":"%s","uptime":"%s","build":"%s","ath11k_nss":"%s","nss_modules":"%s","ecm_ipv4":"%s","ecm_tcp":"%s","ecm_udp":"%s","ecm_pending":"%s","ecm_ipv6":"%s","ecm_tcp6":"%s","ecm_udp6":"%s","ecm_pending6":"%s","ecm_pending_decel":"%s","ecm_pending_decel6":"%s","ecm_exceptions4":"%s","ecm_exceptions6":"%s","ecm_connections":"%s","ecm_hosts":"%s","ecm_ifaces":"%s","ecm_mappings":"%s","ecm_nodes":"%s","lan1":"%s","lan2":"%s","lan3":"%s","lan4":"%s","br_lan":"%s","phy0":"%s","phy1":"%s","wifi_channel":"%s","wifi_irqs":"%s","temperature":"%s","qdisc":"%s","cpu_freq":"%s","wan_link":"%s","pppoe_status":"%s","wan_ipv4":"%s","wan_ipv6":"%s","wan_vlan":"%s","health":"%s","nss_drv":"%s","nss_dp":"%s","ecm_health":"%s"}\n' \
+                # BATMAN-adv Mesh
+                mesh_status="Inactive"
+                mesh_iface="Unavailable"
+                mesh_mac="Unavailable"
+                mesh_gateway="Unavailable"
+                mesh_originators="0"
+                mesh_neighbors="0"
+
+                if ip link show bat0 >/dev/null 2>&1; then
+                        mesh_iface="bat0"
+
+                        mesh_mac="$(cat /sys/class/net/bat0/address 2>/dev/null)"
+                        [ -n "$mesh_mac" ] || mesh_mac="Unavailable"
+
+                        if ip link show bat0 2>/dev/null | grep -q 'state UP'; then
+                                mesh_status="Active"
+                        else
+                                mesh_status="Down"
+                        fi
+
+                        if command -v batctl >/dev/null 2>&1; then
+                                mesh_gateway="$(batctl gw 2>/dev/null |
+                                        awk '/=>/ {print $1 " " $2; exit}')"
+                                [ -n "$mesh_gateway" ] || mesh_gateway="None"
+
+                                mesh_originators="$(batctl o 2>/dev/null |
+                                        awk 'NR > 1 && NF {count++} END {print count+0}')"
+
+                                mesh_neighbors="$(batctl n 2>/dev/null |
+                                        awk 'NR > 1 && NF {count++} END {print count+0}')"
+                        fi
+                fi
+
+                printf '{"cpu_load":"%s","memory":"%s","uptime":"%s","build":"%s","ath11k_nss":"%s","nss_modules":"%s","ecm_ipv4":"%s","ecm_tcp":"%s","ecm_udp":"%s","ecm_pending":"%s","ecm_ipv6":"%s","ecm_tcp6":"%s","ecm_udp6":"%s","ecm_pending6":"%s","ecm_pending_decel":"%s","ecm_pending_decel6":"%s","ecm_exceptions4":"%s","ecm_exceptions6":"%s","ecm_connections":"%s","ecm_hosts":"%s","ecm_ifaces":"%s","ecm_mappings":"%s","ecm_nodes":"%s","lan1":"%s","lan2":"%s","lan3":"%s","lan4":"%s","br_lan":"%s","phy0":"%s","phy1":"%s","wifi_channel":"%s","wifi_irqs":"%s","temperature":"%s","qdisc":"%s","cpu_freq":"%s","wan_link":"%s","pppoe_status":"%s","wan_ipv4":"%s","wan_ipv6":"%s","wan_vlan":"%s","health":"%s","nss_drv":"%s","nss_dp":"%s","ecm_health":"%s","mesh_status":"%s","mesh_iface":"%s","mesh_mac":"%s","mesh_gateway":"%s","mesh_originators":"%s","mesh_neighbors":"%s"}\n' \
                 "$(value "$load")" \
                 "$(value "$memory")" \
                 "$(value "$uptime")" \
@@ -176,7 +209,13 @@ call)
                 "$health" \
                 "$nss_drv" \
                 "$nss_dp" \
-                "$ecm_state"
+                "$ecm_state" \
+                "$(value "$mesh_status")" \
+                "$(value "$mesh_iface")" \
+                "$(value "$mesh_mac")" \
+                "$(value "$mesh_gateway")" \
+                "$mesh_originators" \
+                "$mesh_neighbors"
 
         ;;
         esac

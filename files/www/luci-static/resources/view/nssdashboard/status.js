@@ -244,6 +244,43 @@ return view.extend({
                         );
 
                         /*
+                         * Mesh / BATMAN-adv
+                         */
+                        container.appendChild(section('Mesh / BATMAN-adv'));
+
+                        var meshState = d.mesh_status || 'Inactive';
+
+                        container.appendChild(
+                                grid([
+                                        card(
+                                                'Status',
+                                                meshState,
+                                                color(meshState)
+                                        ),
+                                        card(
+                                                'Interface',
+                                                d.mesh_iface
+                                        ),
+                                        card(
+                                                'MAC',
+                                                d.mesh_mac
+                                        ),
+                                        card(
+                                                'Gateway',
+                                                d.mesh_gateway
+                                        ),
+                                        card(
+                                                'Originators',
+                                                d.mesh_originators
+                                        ),
+                                        card(
+                                                'Neighbors',
+                                                d.mesh_neighbors
+                                        )
+                                ])
+                        );
+
+                        /*
                          * NSS
                          */
                         container.appendChild(section('NSS'));
