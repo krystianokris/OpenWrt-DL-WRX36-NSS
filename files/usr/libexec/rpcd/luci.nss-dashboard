@@ -138,6 +138,21 @@ call)
                 mesh_originators="0"
                 mesh_neighbors="0"
 
+                batman_v="Disabled"
+                batman_bla="Disabled"
+                batman_dat="Disabled"
+                batman_mcast="Disabled"
+
+                usteer_status="Inactive"
+
+                if command -v pidof >/dev/null 2>&1 &&
+                   pidof usteerd >/dev/null 2>&1; then
+                        usteer_status="Active"
+                elif [ -x /etc/init.d/usteer ] &&
+                     /etc/init.d/usteer status >/dev/null 2>&1; then
+                        usteer_status="Active"
+                fi
+
                 if ip link show bat0 >/dev/null 2>&1; then
                         mesh_iface="bat0"
 
@@ -160,10 +175,21 @@ call)
 
                                 mesh_neighbors="$(batctl n 2>/dev/null |
                                         awk 'NR > 1 && NF {count++} END {print count+0}')"
+
+                                batman_v="$(batctl meshif bat0 get hop_penalty 2>/dev/null >/dev/null && printf 'Enabled' || printf 'Disabled')"
+
+                                batman_bla="$(batctl meshif bat0 get bridge_loop_avoidance 2>/dev/null |
+                                        grep -q 'enabled' && printf 'Enabled' || printf 'Disabled')"
+
+                                batman_dat="$(batctl meshif bat0 get distributed_arp_table 2>/dev/null |
+                                        grep -q 'enabled' && printf 'Enabled' || printf 'Disabled')"
+
+                                batman_mcast="$(batctl meshif bat0 get multicast_mode 2>/dev/null |
+                                        grep -qv '^disabled' && printf 'Enabled' || printf 'Disabled')"
                         fi
                 fi
 
-                printf '{"cpu_load":"%s","memory":"%s","uptime":"%s","build":"%s","ath11k_nss":"%s","nss_modules":"%s","ecm_ipv4":"%s","ecm_tcp":"%s","ecm_udp":"%s","ecm_pending":"%s","ecm_ipv6":"%s","ecm_tcp6":"%s","ecm_udp6":"%s","ecm_pending6":"%s","ecm_pending_decel":"%s","ecm_pending_decel6":"%s","ecm_exceptions4":"%s","ecm_exceptions6":"%s","ecm_connections":"%s","ecm_hosts":"%s","ecm_ifaces":"%s","ecm_mappings":"%s","ecm_nodes":"%s","lan1":"%s","lan2":"%s","lan3":"%s","lan4":"%s","br_lan":"%s","phy0":"%s","phy1":"%s","wifi_channel":"%s","wifi_irqs":"%s","temperature":"%s","qdisc":"%s","cpu_freq":"%s","wan_link":"%s","pppoe_status":"%s","wan_ipv4":"%s","wan_ipv6":"%s","wan_vlan":"%s","health":"%s","nss_drv":"%s","nss_dp":"%s","ecm_health":"%s","mesh_status":"%s","mesh_iface":"%s","mesh_mac":"%s","mesh_gateway":"%s","mesh_originators":"%s","mesh_neighbors":"%s"}\n' \
+                printf '{"cpu_load":"%s","memory":"%s","uptime":"%s","build":"%s","ath11k_nss":"%s","nss_modules":"%s","ecm_ipv4":"%s","ecm_tcp":"%s","ecm_udp":"%s","ecm_pending":"%s","ecm_ipv6":"%s","ecm_tcp6":"%s","ecm_udp6":"%s","ecm_pending6":"%s","ecm_pending_decel":"%s","ecm_pending_decel6":"%s","ecm_exceptions4":"%s","ecm_exceptions6":"%s","ecm_connections":"%s","ecm_hosts":"%s","ecm_ifaces":"%s","ecm_mappings":"%s","ecm_nodes":"%s","lan1":"%s","lan2":"%s","lan3":"%s","lan4":"%s","br_lan":"%s","phy0":"%s","phy1":"%s","wifi_channel":"%s","wifi_irqs":"%s","temperature":"%s","qdisc":"%s","cpu_freq":"%s","wan_link":"%s","pppoe_status":"%s","wan_ipv4":"%s","wan_ipv6":"%s","wan_vlan":"%s","health":"%s","nss_drv":"%s","nss_dp":"%s","ecm_health":"%s","mesh_status":"%s","mesh_iface":"%s","mesh_mac":"%s","mesh_gateway":"%s","mesh_originators":"%s","mesh_neighbors":"%s","batman_v":"%s","batman_bla":"%s","batman_dat":"%s","batman_mcast":"%s","usteer_status":"%s"}\n' \
                 "$(value "$load")" \
                 "$(value "$memory")" \
                 "$(value "$uptime")" \
@@ -215,7 +241,12 @@ call)
                 "$(value "$mesh_mac")" \
                 "$(value "$mesh_gateway")" \
                 "$mesh_originators" \
-                "$mesh_neighbors"
+                "$mesh_neighbors" \
+                "$(value "$batman_v")" \
+                "$(value "$batman_bla")" \
+                "$(value "$batman_dat")" \
+                "$(value "$batman_mcast")" \
+                "$(value "$usteer_status")"
 
         ;;
         esac
