@@ -170,6 +170,8 @@ call)
                 "$pppoe_link" \
                 "$(value "$wan_ipv4")" \
                 "$(value "$wan_ipv6")" \
+                "$wan_rx" \
+                "$wan_tx" \
                 "$vlan" \
                 "$health" \
                 "$nss_drv" \

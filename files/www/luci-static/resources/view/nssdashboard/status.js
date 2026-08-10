@@ -46,6 +46,21 @@ function warningNumberColor(v) {
                 '#b7791f' : '#17803d';
 }
 
+function formatBytes(v) {
+        var n = parseInt(v, 10) || 0;
+
+        if (n >= 1073741824)
+                return (n / 1073741824).toFixed(2) + ' GB';
+
+        if (n >= 1048576)
+                return (n / 1048576).toFixed(1) + ' MB';
+
+        if (n >= 1024)
+                return (n / 1024).toFixed(1) + ' KB';
+
+        return n + ' B';
+}
+
 function statusBadgeStyle(v) {
         var c = color(v);
 
@@ -222,6 +237,8 @@ return view.extend({
                                         card('PPPoE', d.pppoe_status, color(d.pppoe_status)),
                                         card('IPv4', d.wan_ipv4),
                                         card('IPv6', d.wan_ipv6),
+                                        card('WAN RX', formatBytes(d.wan_rx)),
+                                        card('WAN TX', formatBytes(d.wan_tx)),
                                         card('VLAN', d.wan_vlan)
                                 ])
                         );
@@ -433,7 +450,7 @@ return view.extend({
 
                         container.appendChild(
                                 grid([
-                                        card('CPU load', d.cpu_load),
+                                        card('Load average', d.cpu_load),
                                         card('Memory', d.memory),
                                         card('Uptime', d.uptime),
                                         card('Temperature', d.temperature),
