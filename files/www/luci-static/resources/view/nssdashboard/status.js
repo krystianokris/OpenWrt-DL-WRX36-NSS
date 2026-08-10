@@ -76,10 +76,10 @@ function card(label, val, state) {
 function section(title) {
         return E('div', {
                 'style':
-                        'font-size:14px;' +
+                        'font-size:13px;' +
                         'font-weight:700;' +
                         'color:#30343a;' +
-                        'margin:18px 0 8px'
+                        'margin:14px 0 7px'
         }, title);
 }
 
@@ -419,8 +419,7 @@ return view.extend({
                                         card('Memory', d.memory),
                                         card('Uptime', d.uptime),
                                         card('Temperature', d.temperature),
-                                        card('CPU frequency', d.cpu_freq),
-                                        card('NSS modules', d.nss_modules)
+                                        card('CPU frequency', d.cpu_freq)
                                 ])
                         );
 
