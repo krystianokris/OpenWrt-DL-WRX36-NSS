@@ -11,6 +11,9 @@ env:
   OPENWRT_BRANCH: dl-wrx36-nss
   TARGET: qualcommax/ipq807x
 
+  # Zmień na v2/v3 itd. tylko gdy chcesz wymusić całkowicie nowy cache.
+  CACHE_VERSION: v1
+
 jobs:
   build:
     runs-on: ubuntu-24.04
@@ -78,7 +81,7 @@ jobs:
 
 
     # ============================================================
-    # CLONE OPENWRT
+    # CLONE OPENWRT NSS
     # ============================================================
 
     - name: Clone OpenWrt NSS
@@ -124,24 +127,22 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ~/.ccache
-        key: dlwrx36-ccache-${{ hashFiles('configs/dl-wrx36.config', 'files/**', 'patches/**', 'scripts/**') }}
+        key: dlwrx36-${{ env.CACHE_VERSION }}-ccache-${{ hashFiles('configs/dl-wrx36.config', 'files/**', 'patches/**', 'scripts/**') }}
         restore-keys: |
-          dlwrx36-ccache-
+          dlwrx36-${{ env.CACHE_VERSION }}-ccache-
 
 
     # ============================================================
     # CACHE OPENWRT DOWNLOADS
-    # IMPORTANT:
-    # This is AFTER clone, otherwise rm -rf openwrt deletes cache.
     # ============================================================
 
     - name: Cache OpenWrt downloads
       uses: actions/cache@v4
       with:
         path: openwrt/dl
-        key: dlwrx36-dl-${{ hashFiles('configs/dl-wrx36.config') }}
+        key: dlwrx36-${{ env.CACHE_VERSION }}-dl-${{ hashFiles('configs/dl-wrx36.config') }}
         restore-keys: |
-          dlwrx36-dl-
+          dlwrx36-${{ env.CACHE_VERSION }}-dl-
 
 
     # ============================================================
@@ -213,6 +214,7 @@ jobs:
         cp ../configs/dl-wrx36.config .config
 
         echo "===== RUNNING DEFCONFIG ====="
+
         make defconfig
 
 
@@ -290,6 +292,103 @@ jobs:
       run: |
         rm -rf openwrt/files/usr/lib/lua/luci/controller/dlwrx36.lua || true
         rm -rf openwrt/files/usr/lib/lua/luci/view/dlwrx36 || true
+
+
+    # ============================================================
+    # CREATE BUILD INFORMATION
+    # ============================================================
+
+    - name: Create build information
+      working-directory: openwrt
+      run: |
+        BUILD_DATE="$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+        OPENWRT_COMMIT="$(git rev-parse HEAD)"
+
+        mkdir -p files/etc
+
+        cat > files/etc/dl-wrx36-build <<EOF
+        DL-WRX36 NSS BUILD
+
+        Build number: ${{ github.run_number }}
+        Build ID: ${{ github.run_id }}
+
+        Build date: ${BUILD_DATE}
+
+        OpenWrt repository:
+        ${{ env.OPENWRT_REPO }}
+
+        OpenWrt branch:
+        ${{ env.OPENWRT_BRANCH }}
+
+        OpenWrt commit:
+        ${OPENWRT_COMMIT}
+
+        Target:
+        ${{ env.TARGET }}
+
+        Features:
+        Qualcomm NSS
+        ECM
+        ath11k NSS offload
+        NSS qdisc
+        SQM NSS
+        NSS IGS
+        Custom LuCI dashboard
+
+        WiFi:
+        wpad-openssl
+        hostapd-openssl
+
+        Mesh:
+        DISABLED
+        EOF
+
+        echo "===== BUILD INFORMATION ====="
+        cat files/etc/dl-wrx36-build
+
+
+    # ============================================================
+    # CREATE DYNAMIC BANNER
+    # ============================================================
+
+    - name: Create dynamic banner
+      working-directory: openwrt
+      run: |
+        BUILD_DATE="$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+        OPENWRT_COMMIT="$(git rev-parse --short HEAD)"
+
+        mkdir -p files/etc
+
+        cat > files/etc/banner <<EOF
+
+          ██████╗ ██╗     - WRX36
+          ██╔══██╗██║
+          ██║  ██║██║
+          ██║  ██║██║
+          ██████╔╝███████╗
+          ╚═════╝ ╚══════╝
+
+          Dynalink DL-WRX36
+          ================================
+
+          NSS / ECM        : ENABLED
+          NSS Qdisc        : ENABLED
+          SQM NSS          : ENABLED
+          NSS IGS          : ENABLED
+
+          WiFi              : WPA/OPENSSL
+          Mesh              : DISABLED
+
+          Build             : ${{ github.run_number }}
+          Date              : ${BUILD_DATE}
+          Commit            : ${OPENWRT_COMMIT}
+
+          ================================
+
+        EOF
+
+        echo "===== BANNER ====="
+        cat files/etc/banner
 
 
     # ============================================================
@@ -437,6 +536,45 @@ jobs:
 
 
     # ============================================================
+    # CHECK FIRMWARE SIZE
+    # ============================================================
+
+    - name: Check firmware size
+      run: |
+        echo "===== FIRMWARE SIZE ====="
+
+        find openwrt/bin/targets/${{ env.TARGET }} \
+          -maxdepth 2 \
+          -type f \
+          -name '*sysupgrade*' \
+          -exec ls -lh {} \;
+
+        echo
+        echo "Firmware size check completed."
+
+
+    # ============================================================
+    # SHA256
+    # ============================================================
+
+    - name: Generate SHA256
+      run: |
+        mkdir -p artifacts
+
+        find openwrt/bin/targets/${{ env.TARGET }} \
+          -maxdepth 2 \
+          -type f \
+          \( \
+            -name '*sysupgrade*' \
+            -o -name '*factory*' \
+          \) \
+          -exec sha256sum {} \; > artifacts/sha256sums.txt
+
+        echo "===== SHA256 ====="
+        cat artifacts/sha256sums.txt
+
+
+    # ============================================================
     # PREPARE ARTIFACTS
     # ============================================================
 
@@ -456,7 +594,7 @@ jobs:
         cp diffconfig.txt \
           artifacts/ || true
 
-        cp files/etc/dl-wrx36-nss-build \
+        cp openwrt/files/etc/dl-wrx36-nss-build \
           artifacts/ || true
 
         cp pinned-commit.txt \
@@ -488,8 +626,11 @@ jobs:
       with:
         tag_name: dl-wrx36-${{ github.run_number }}
         name: DL-WRX36 NSS Build ${{ github.run_number }}
+
         body: |
           DL-WRX36 NSS Build
+
+          ================================================
 
           Features:
           - Qualcomm NSS acceleration
@@ -502,7 +643,11 @@ jobs:
           - NSS dashboard
           - Native LuCI JS interface
           - Standard WPA/OpenSSL WiFi
-          - Mesh/WPA mesh packages intentionally NOT enabled
+
+          Mesh:
+          - DISABLED
+
+          ================================================
 
           Source:
           ${{ env.OPENWRT_REPO }}
@@ -510,11 +655,14 @@ jobs:
           Branch:
           ${{ env.OPENWRT_BRANCH }}
 
+          Build:
+          GitHub Actions run ${{ github.run_number }}
+
           Commit:
           See pinned-commit.txt
 
-          Build:
-          GitHub Actions run ${{ github.run_number }}
+          SHA256:
+          See sha256sums.txt
 
         files: artifacts/*
 
