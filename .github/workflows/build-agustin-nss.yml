@@ -259,10 +259,11 @@ jobs:
         echo
         echo "===== VERIFY NORMAL WIFI ====="
 
-        test "$(grep -c '^CONFIG_PACKAGE_wpad-openssl=y$' .config)" -eq 1 || {
-          echo "ERROR: normal wpad-openssl is not enabled!"
+        if ! grep -q '^CONFIG_PACKAGE_wpad-openssl=[ym]$' .config; then
+          echo "ERROR: normal wpad-openssl is NOT enabled!"
           exit 1
-        }
+        fi
+        echo "OK: normal wpad-openssl available"
 
         if grep -q '^CONFIG_PACKAGE_wpad-mesh-openssl=y$' .config; then
           echo "ERROR: wpad-mesh-openssl is enabled!"
@@ -361,29 +362,29 @@ jobs:
 
         cat > files/etc/banner <<EOF
 
-          ██████╗ ██╗     - WRX36
-          ██╔══██╗██║
-          ██║  ██║██║
-          ██║  ██║██║
-          ██████╔╝███████╗
-          ╚═════╝ ╚══════╝
+         ██████╗ ██╗    - WRX36
+         ██╔══██╗██║
+         ██║  ██║██║
+         ██║  ██║██║
+         ██████╔╝███████╗
+         ╚═════╝ ╚══════╝
 
-          Dynalink DL-WRX36
-          ================================
+         Dynalink DL-WRX36
+         ================________________
 
-          NSS / ECM        : ENABLED
-          NSS Qdisc        : ENABLED
-          SQM NSS          : ENABLED
-          NSS IGS          : ENABLED
+         NSS / ECM        : ENABLED
+         NSS Qdisc        : ENABLED
+         SQM NSS          : ENABLED
+         NSS IGS          : ENABLED
 
-          WiFi              : WPA/OPENSSL
-          Mesh              : DISABLED
+         WiFi             : WPA/OPENSSL
+         Mesh             : DISABLED
 
-          Build             : ${{ github.run_number }}
-          Date              : ${BUILD_DATE}
-          Commit            : ${OPENWRT_COMMIT}
+         Build            : ${{ github.run_number }}
+         Date             : ${BUILD_DATE}
+         Commit           : ${OPENWRT_COMMIT}
 
-          ================================
+         ================================
 
         EOF
 
@@ -630,7 +631,7 @@ jobs:
         body: |
           DL-WRX36 NSS Build
 
-          ================================================
+          ================________________
 
           Features:
           - Qualcomm NSS acceleration
@@ -647,7 +648,7 @@ jobs:
           Mesh:
           - DISABLED
 
-          ================================================
+          ================================
 
           Source:
           ${{ env.OPENWRT_REPO }}
