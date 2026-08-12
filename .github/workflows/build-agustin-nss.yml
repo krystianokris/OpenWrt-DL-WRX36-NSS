@@ -115,7 +115,7 @@ jobs:
       run: |
         git rev-parse HEAD > ../pinned-commit.txt
 
-        echo "Pinned commit:"
+        echo "===== PINNED COMMIT ====="
         cat ../pinned-commit.txt
 
 
@@ -136,6 +136,10 @@ jobs:
     # CACHE OPENWRT DOWNLOADS
     # ============================================================
 
+    # UWAGA:
+    # Cache jest przywracany PO clone, żeby późniejszy rm -rf
+    # nie skasował przywróconego katalogu openwrt/dl.
+
     - name: Cache OpenWrt downloads
       uses: actions/cache@v4
       with:
@@ -155,6 +159,8 @@ jobs:
         rm -rf tmp
         rm -rf feeds
         rm -f .config
+
+        echo "===== OPENWRT STATE CLEANED ====="
 
 
     # ============================================================
@@ -219,6 +225,30 @@ jobs:
 
 
     # ============================================================
+    # FORCE NORMAL WIFI / DISABLE MESH
+    # ============================================================
+
+    - name: Enforce normal WiFi configuration
+      working-directory: openwrt
+      run: |
+        echo "===== ENFORCING WIFI CONFIG ====="
+
+        sed -i '/^CONFIG_PACKAGE_wpad-mesh-openssl=/d' .config
+        sed -i '/^CONFIG_PACKAGE_wpad-openssl=/d' .config
+
+        echo 'CONFIG_PACKAGE_wpad-openssl=y' >> .config
+
+        make defconfig
+
+        echo
+        echo "===== FINAL WIFI CONFIG ====="
+
+        grep -E \
+          '^CONFIG_PACKAGE_(wpad|hostapd)' \
+          .config || true
+
+
+    # ============================================================
     # VERIFY IMPORTANT CONFIG
     # ============================================================
 
@@ -241,35 +271,47 @@ jobs:
         echo
         echo "===== VERIFY SQM NSS ====="
 
-        test "$(grep -c '^CONFIG_PACKAGE_sqm-scripts-nss=y$' .config)" -eq 1 || {
-          echo "ERROR: sqm-scripts-nss is not enabled!"
-          exit 1
-        }
+        grep -Eq \
+          '^CONFIG_PACKAGE_sqm-scripts-nss=y$' \
+          .config || {
+            echo "ERROR: sqm-scripts-nss is NOT enabled!"
+            exit 1
+          }
 
-        test "$(grep -c '^CONFIG_PACKAGE_kmod-qca-nss-drv-qdisc=y$' .config)" -eq 1 || {
-          echo "ERROR: NSS qdisc is not enabled!"
-          exit 1
-        }
+        grep -Eq \
+          '^CONFIG_PACKAGE_kmod-qca-nss-drv-qdisc=y$' \
+          .config || {
+            echo "ERROR: NSS qdisc is NOT enabled!"
+            exit 1
+          }
 
-        test "$(grep -c '^CONFIG_PACKAGE_kmod-qca-nss-drv-igs=y$' .config)" -eq 1 || {
-          echo "ERROR: NSS IGS is not enabled!"
-          exit 1
-        }
+        grep -Eq \
+          '^CONFIG_PACKAGE_kmod-qca-nss-drv-igs=y$' \
+          .config || {
+            echo "ERROR: NSS IGS is NOT enabled!"
+            exit 1
+          }
 
         echo
         echo "===== VERIFY NORMAL WIFI ====="
 
-        if ! grep -q '^CONFIG_PACKAGE_wpad-openssl=[ym]$' .config; then
-          echo "ERROR: normal wpad-openssl is NOT enabled!"
-          exit 1
-        fi
+        grep -Eq \
+          '^CONFIG_PACKAGE_wpad-openssl=(y|m)$' \
+          .config || {
+            echo "ERROR: normal wpad-openssl is NOT enabled!"
+            exit 1
+          }
+
         echo "OK: normal wpad-openssl available"
 
-        if grep -q '^CONFIG_PACKAGE_wpad-mesh-openssl=y$' .config; then
-          echo "ERROR: wpad-mesh-openssl is enabled!"
+        if grep -Eq '^CONFIG_PACKAGE_wpad-mesh-openssl=y$' .config; then
+          echo
+          echo "ERROR: wpad-mesh-openssl is ENABLED!"
           echo "Mesh configuration must NOT be included in this build."
           exit 1
         fi
+
+        echo "OK: wpad-mesh-openssl disabled"
 
         echo
         echo "===== NSS / WIFI CONFIG OK ====="
@@ -313,7 +355,8 @@ jobs:
         Build number: ${{ github.run_number }}
         Build ID: ${{ github.run_id }}
 
-        Build date: ${BUILD_DATE}
+        Build date:
+        ${BUILD_DATE}
 
         OpenWrt repository:
         ${{ env.OPENWRT_REPO }}
@@ -370,7 +413,7 @@ jobs:
          ╚═════╝ ╚══════╝
 
          Dynalink DL-WRX36
-         ================________________
+         ================================
 
          NSS / ECM        : ENABLED
          NSS Qdisc        : ENABLED
@@ -437,6 +480,7 @@ jobs:
       working-directory: openwrt
       run: |
         export PATH="/usr/lib/ccache:$PATH"
+        export CCACHE_DIR="$HOME/.ccache"
 
         ccache -M 10G
 
@@ -453,6 +497,7 @@ jobs:
       working-directory: openwrt
       run: |
         export PATH="/usr/lib/ccache:$PATH"
+        export CCACHE_DIR="$HOME/.ccache"
 
         echo "===== BUILD TOOLCHAIN ====="
 
@@ -595,7 +640,10 @@ jobs:
         cp diffconfig.txt \
           artifacts/ || true
 
-        cp openwrt/files/etc/dl-wrx36-nss-build \
+        cp openwrt/files/etc/dl-wrx36-build \
+          artifacts/ || true
+
+        cp openwrt/files/etc/banner \
           artifacts/ || true
 
         cp pinned-commit.txt \
@@ -631,7 +679,7 @@ jobs:
         body: |
           DL-WRX36 NSS Build
 
-          ================________________
+          ==================================
 
           Features:
           - Qualcomm NSS acceleration
@@ -648,7 +696,7 @@ jobs:
           Mesh:
           - DISABLED
 
-          ================================
+          ==================================
 
           Source:
           ${{ env.OPENWRT_REPO }}
