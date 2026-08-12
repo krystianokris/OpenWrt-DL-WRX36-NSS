@@ -16,19 +16,47 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
+
+    # ============================================================
+    # CHECKOUT
+    # ============================================================
+
     - name: Checkout
       uses: actions/checkout@v4
 
+
+    # ============================================================
+    # FREE DISK SPACE
+    # ============================================================
+
     - name: Free disk space
       run: |
+        echo "===== DISK BEFORE ====="
+        df -h
+
         sudo rm -rf /usr/local/lib/android
         sudo rm -rf /usr/share/dotnet
         sudo rm -rf /opt/ghc
+        sudo rm -rf /usr/local/share/boost
+
+        sudo docker image prune -a -f || true
+        sudo docker system prune -af || true
+
         sudo apt clean
+
+        echo
+        echo "===== DISK AFTER ====="
+        df -h
+
+
+    # ============================================================
+    # DEPENDENCIES
+    # ============================================================
 
     - name: Install dependencies
       run: |
         sudo apt update
+
         sudo apt install -y \
           build-essential \
           clang \
@@ -48,15 +76,66 @@ jobs:
           file \
           ccache
 
+
+    # ============================================================
+    # CLONE OPENWRT
+    # ============================================================
+
+    - name: Clone OpenWrt NSS
+      run: |
+        rm -rf openwrt
+
+        git clone \
+          --branch "${{ env.OPENWRT_BRANCH }}" \
+          "${{ env.OPENWRT_REPO }}" \
+          openwrt
+
+        cd openwrt
+
+        echo "===== OPENWRT SOURCE ====="
+        echo "Repository: ${{ env.OPENWRT_REPO }}"
+        echo "Branch:     ${{ env.OPENWRT_BRANCH }}"
+        echo
+        echo "Current commit:"
+        git rev-parse HEAD
+        echo
+        echo "Last commits:"
+        git log --oneline -5
+
+
+    # ============================================================
+    # PIN COMMIT
+    # ============================================================
+
+    - name: Save pinned commit
+      working-directory: openwrt
+      run: |
+        git rev-parse HEAD > ../pinned-commit.txt
+
+        echo "Pinned commit:"
+        cat ../pinned-commit.txt
+
+
+    # ============================================================
+    # CACHE CCACHE
+    # ============================================================
+
     - name: Cache ccache
       uses: actions/cache@v4
       with:
         path: ~/.ccache
-        key: dlwrx36-ccache-${{ hashFiles('configs/dl-wrx36.config') }}
+        key: dlwrx36-ccache-${{ hashFiles('configs/dl-wrx36.config', 'files/**', 'patches/**', 'scripts/**') }}
         restore-keys: |
           dlwrx36-ccache-
 
-    - name: Cache OpenWrt dl
+
+    # ============================================================
+    # CACHE OPENWRT DOWNLOADS
+    # IMPORTANT:
+    # This is AFTER clone, otherwise rm -rf openwrt deletes cache.
+    # ============================================================
+
+    - name: Cache OpenWrt downloads
       uses: actions/cache@v4
       with:
         path: openwrt/dl
@@ -64,24 +143,10 @@ jobs:
         restore-keys: |
           dlwrx36-dl-
 
-    - name: Clone Agustin NSS
-      run: |
-        rm -rf openwrt
 
-        git clone \
-          --branch ${{ env.OPENWRT_BRANCH }} \
-          ${{ env.OPENWRT_REPO }} \
-          openwrt
-
-        cd openwrt
-        echo "Current commit:"
-        git rev-parse HEAD
-        git log --oneline -5
-
-    - name: Save pinned commit
-      working-directory: openwrt
-      run: |
-        git rev-parse HEAD > ../pinned-commit.txt
+    # ============================================================
+    # CLEAN OPENWRT STATE
+    # ============================================================
 
     - name: Clean OpenWrt state
       working-directory: openwrt
@@ -89,6 +154,11 @@ jobs:
         rm -rf tmp
         rm -rf feeds
         rm -f .config
+
+
+    # ============================================================
+    # PATCH APK FEED GENERATION
+    # ============================================================
 
     - name: Patch APK feed generation
       working-directory: openwrt
@@ -122,56 +192,176 @@ jobs:
         sed -n '/define FeedSourcesAppendAPK/,/endef/p' include/feeds.mk
 
 
+    # ============================================================
+    # UPDATE FEEDS
+    # ============================================================
+
     - name: Update feeds
       working-directory: openwrt
       run: |
         ./scripts/feeds update -a
         ./scripts/feeds install -a
 
+
+    # ============================================================
+    # IMPORT CONFIG
+    # ============================================================
+
     - name: Import NSS config
       working-directory: openwrt
       run: |
         cp ../configs/dl-wrx36.config .config
+
+        echo "===== RUNNING DEFCONFIG ====="
         make defconfig
+
+
+    # ============================================================
+    # VERIFY IMPORTANT CONFIG
+    # ============================================================
+
+    - name: Verify NSS configuration
+      working-directory: openwrt
+      run: |
+        echo "===== NSS / SQM CONFIG ====="
+
+        grep -E \
+          '^CONFIG_PACKAGE_(sqm-scripts-nss|kmod-qca-nss-drv-qdisc|kmod-qca-nss-drv-igs)=' \
+          .config || true
+
+        echo
+        echo "===== WIFI CONFIG ====="
+
+        grep -E \
+          '^CONFIG_PACKAGE_(wpad|hostapd)' \
+          .config || true
+
+        echo
+        echo "===== VERIFY SQM NSS ====="
+
+        test "$(grep -c '^CONFIG_PACKAGE_sqm-scripts-nss=y$' .config)" -eq 1 || {
+          echo "ERROR: sqm-scripts-nss is not enabled!"
+          exit 1
+        }
+
+        test "$(grep -c '^CONFIG_PACKAGE_kmod-qca-nss-drv-qdisc=y$' .config)" -eq 1 || {
+          echo "ERROR: NSS qdisc is not enabled!"
+          exit 1
+        }
+
+        test "$(grep -c '^CONFIG_PACKAGE_kmod-qca-nss-drv-igs=y$' .config)" -eq 1 || {
+          echo "ERROR: NSS IGS is not enabled!"
+          exit 1
+        }
+
+        echo
+        echo "===== VERIFY NORMAL WIFI ====="
+
+        test "$(grep -c '^CONFIG_PACKAGE_wpad-openssl=y$' .config)" -eq 1 || {
+          echo "ERROR: normal wpad-openssl is not enabled!"
+          exit 1
+        }
+
+        if grep -q '^CONFIG_PACKAGE_wpad-mesh-openssl=y$' .config; then
+          echo "ERROR: wpad-mesh-openssl is enabled!"
+          echo "Mesh configuration must NOT be included in this build."
+          exit 1
+        fi
+
+        echo
+        echo "===== NSS / WIFI CONFIG OK ====="
+
+
+    # ============================================================
+    # APPLY CUSTOM FILES
+    # ============================================================
 
     - name: Apply custom files
       run: |
         mkdir -p openwrt/files
         cp -a files/. openwrt/files/
 
+
+    # ============================================================
+    # REMOVE OLD LUA LUCi FILES
+    # ============================================================
+
     - name: Remove old Lua LuCI files
       run: |
         rm -rf openwrt/files/usr/lib/lua/luci/controller/dlwrx36.lua || true
         rm -rf openwrt/files/usr/lib/lua/luci/view/dlwrx36 || true
+
+
+    # ============================================================
+    # CONFIGURE OPENWRT
+    # ============================================================
 
     - name: Configure OpenWrt
       working-directory: openwrt
       run: |
         ./scripts/diffconfig.sh > ../diffconfig.txt
 
+        echo "===== DIFFCONFIG ====="
+        cat ../diffconfig.txt
+
+
+    # ============================================================
+    # VERIFY LUCi FILES
+    # ============================================================
+
     - name: Verify LuCI files
       run: |
         echo "Checking DL-WRX36 dashboard"
+
         test -f files/www/luci-static/resources/view/dlwrx36/nss.js
         test -f files/usr/libexec/rpcd/luci.nss-dashboard
-        echo "OK"
+
+        echo "OK: dashboard files present"
+
+
+    # ============================================================
+    # DOWNLOAD SOURCES
+    # ============================================================
 
     - name: Download sources
       working-directory: openwrt
       run: |
         make download V=s
 
+
+    # ============================================================
+    # BUILD TOOLS
+    # ============================================================
+
     - name: Build tools
       working-directory: openwrt
       run: |
-        make tools/install -j$(nproc) V=s || \
-        make tools/install V=s
+        export PATH="/usr/lib/ccache:$PATH"
+
+        ccache -M 10G
+
+        echo "===== BUILD TOOLS ====="
+
+        make tools/install -j$(nproc) V=s
+
+
+    # ============================================================
+    # BUILD TOOLCHAIN
+    # ============================================================
 
     - name: Build toolchain
       working-directory: openwrt
       run: |
-        make toolchain/install -j$(nproc) V=s || \
-        make toolchain/install V=s
+        export PATH="/usr/lib/ccache:$PATH"
+
+        echo "===== BUILD TOOLCHAIN ====="
+
+        make toolchain/install -j$(nproc) V=s
+
+
+    # ============================================================
+    # BUILD FIRMWARE
+    # ============================================================
 
     - name: Build firmware
       working-directory: openwrt
@@ -179,29 +369,118 @@ jobs:
         CONFIG_CCACHE: 1
       run: |
         export PATH="/usr/lib/ccache:$PATH"
+        export CCACHE_DIR="$HOME/.ccache"
+
         ccache -M 10G
-        make -j$(nproc) V=s || \
-        make V=s
+
+        echo "===== CCACHE BEFORE BUILD ====="
+        ccache -s
+
+        echo
+        echo "===== BUILD FIRMWARE ====="
+
+        make -j$(nproc) V=s
+
+        echo
+        echo "===== CCACHE AFTER BUILD ====="
+        ccache -s
+
+
+    # ============================================================
+    # SHOW REJECTED PATCHES IF BUILD FAILS
+    # ============================================================
 
     - name: Show rejected patch hunks on failure
       if: failure()
       run: |
-        find openwrt -name "*.rej" -print -exec cat {} \;
+        echo "===== REJECTED PATCHES ====="
+
+        find openwrt \
+          -name "*.rej" \
+          -print \
+          -exec cat {} \; || true
+
+
+    # ============================================================
+    # VERIFY BUILD OUTPUT
+    # ============================================================
+
+    - name: Verify firmware output
+      run: |
+        echo "===== BUILD OUTPUT ====="
+
+        ls -lah openwrt/bin/targets/${{ env.TARGET }}/
+
+        echo
+        echo "===== FIRMWARE FILES ====="
+
+        find openwrt/bin/targets/${{ env.TARGET }} \
+          -maxdepth 2 \
+          -type f \
+          \( \
+            -name '*sysupgrade*' \
+            -o -name '*factory*' \
+            -o -name '*.manifest' \
+            -o -name '*.itb' \
+            -o -name '*.bin' \
+          \) \
+          -print
+
+        test -n "$(find openwrt/bin/targets/${{ env.TARGET }} \
+          -maxdepth 2 \
+          -type f \
+          -name '*sysupgrade*' \
+          -print -quit)"
+
+        echo
+        echo "===== FIRMWARE OUTPUT OK ====="
+
+
+    # ============================================================
+    # PREPARE ARTIFACTS
+    # ============================================================
 
     - name: Prepare artifacts
       run: |
         mkdir -p artifacts
-        cp openwrt/bin/targets/${{ env.TARGET }}/*sysupgrade* artifacts/ || true
-        cp openwrt/bin/targets/${{ env.TARGET }}/*factory* artifacts/ || true
-        cp diffconfig.txt artifacts/ || true
-        cp files/etc/dl-wrx36-nss-build artifacts/ || true
-        cp pinned-commit.txt artifacts/ || true
+
+        cp openwrt/bin/targets/${{ env.TARGET }}/*sysupgrade* \
+          artifacts/ || true
+
+        cp openwrt/bin/targets/${{ env.TARGET }}/*factory* \
+          artifacts/ || true
+
+        cp openwrt/bin/targets/${{ env.TARGET }}/*.manifest \
+          artifacts/ || true
+
+        cp diffconfig.txt \
+          artifacts/ || true
+
+        cp files/etc/dl-wrx36-nss-build \
+          artifacts/ || true
+
+        cp pinned-commit.txt \
+          artifacts/ || true
+
+        echo
+        echo "===== ARTIFACTS ====="
+        ls -lah artifacts/
+
+
+    # ============================================================
+    # UPLOAD ARTIFACTS
+    # ============================================================
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: DL-WRX36-NSS-${{ github.run_number }}
         path: artifacts/
+
+
+    # ============================================================
+    # RELEASE
+    # ============================================================
 
     - name: Release
       uses: softprops/action-gh-release@v2
@@ -217,11 +496,27 @@ jobs:
           - ECM acceleration
           - ath11k NSS offload
           - NSS qdisc
+          - SQM NSS scripts
+          - NSS IGS
           - ECM dashboard
           - NSS dashboard
           - Native LuCI JS interface
+          - Standard WPA/OpenSSL WiFi
+          - Mesh/WPA mesh packages intentionally NOT enabled
 
-          Source: AgustinLorenzo/openwrt (branch: main_nss)
+          Source:
+          ${{ env.OPENWRT_REPO }}
+
+          Branch:
+          ${{ env.OPENWRT_BRANCH }}
+
+          Commit:
+          See pinned-commit.txt
+
+          Build:
+          GitHub Actions run ${{ github.run_number }}
+
         files: artifacts/*
+
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
