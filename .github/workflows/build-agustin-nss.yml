@@ -99,8 +99,10 @@ jobs:
         echo "Repository: ${{ env.OPENWRT_REPO }}"
         echo "Branch:     ${{ env.OPENWRT_BRANCH }}"
         echo
+
         echo "Current commit:"
         git rev-parse HEAD
+
         echo
         echo "Last commits:"
         git log --oneline -5
@@ -135,10 +137,6 @@ jobs:
     # ============================================================
     # CACHE OPENWRT DOWNLOADS
     # ============================================================
-
-    # UWAGA:
-    # Cache jest przywracany PO clone, żeby późniejszy rm -rf
-    # nie skasował przywróconego katalogu openwrt/dl.
 
     - name: Cache OpenWrt downloads
       uses: actions/cache@v4
@@ -176,7 +174,12 @@ jobs:
         p = Path("include/feeds.mk")
         s = p.read_text()
 
-        start = s.index("define FeedSourcesAppendAPK")
+        marker = "define FeedSourcesAppendAPK"
+
+        if marker not in s:
+            raise SystemExit("ERROR: FeedSourcesAppendAPK definition not found")
+
+        start = s.index(marker)
         end = s.index("endef", start) + len("endef")
 
         new_block = r'''define FeedSourcesAppendAPK
@@ -185,10 +188,13 @@ jobs:
           echo '# Add your custom feeds to /etc/apk/repositories.d/customfeeds.list'; \
           echo '%U/packages/%A/base/packages.adb'; \
           $(if $(CONFIG_BUILDBOT), \
-                echo '%U/targets/%S/kmods/$(LINUX_VERSION)-$(LINUX_RELEASE)-$(LINUX_VERMAGIC)/packages.adb';) \
+            echo '%U/targets/%S/kmods/$(LINUX_VERSION)-$(LINUX_RELEASE)-$(LINUX_VERMAGIC)/packages.adb'; \
+          ) \
           $(foreach feed,$(FEEDS_AVAILABLE), \
-                $(if $(CONFIG_FEED_$(feed)), \
-                        echo '%U/packages/%A/$(feed)/packages.adb';)) \
+            $(if $(CONFIG_FEED_$(feed)), \
+              echo '%U/packages/%A/$(feed)/packages.adb'; \
+            ) \
+          ) \
         ) >> $(1)
         endef'''
 
@@ -231,7 +237,7 @@ jobs:
     - name: Enforce normal WiFi configuration
       working-directory: openwrt
       run: |
-        echo "===== ENFORCING WIFI CONFIG ====="
+        echo "===== ENFORCING NORMAL WIFI ====="
 
         sed -i '/^CONFIG_PACKAGE_wpad-mesh-openssl=/d' .config
         sed -i '/^CONFIG_PACKAGE_wpad-openssl=/d' .config
@@ -246,6 +252,52 @@ jobs:
         grep -E \
           '^CONFIG_PACKAGE_(wpad|hostapd)' \
           .config || true
+
+
+    # ============================================================
+    # FORCE BATMAN OFF
+    # ============================================================
+
+    - name: Enforce BATMAN / Mesh disabled
+      working-directory: openwrt
+      run: |
+        echo "===== DISABLING BATMAN / MESH ====="
+
+        sed -i '/^CONFIG_PACKAGE_kmod-batman-adv=/d' .config
+        sed -i '/^CONFIG_PACKAGE_batctl-full=/d' .config
+        sed -i '/^CONFIG_PACKAGE_batctl-tiny=/d' .config
+        sed -i '/^CONFIG_PACKAGE_luci-proto-batman-adv=/d' .config
+
+        echo 'CONFIG_PACKAGE_kmod-batman-adv=n' >> .config
+        echo 'CONFIG_PACKAGE_batctl-full=n' >> .config
+        echo 'CONFIG_PACKAGE_batctl-tiny=n' >> .config
+        echo 'CONFIG_PACKAGE_luci-proto-batman-adv=n' >> .config
+
+        make defconfig
+
+        echo
+        echo "===== BATMAN CONFIG CHECK ====="
+
+        if grep -Eq \
+          '^CONFIG_PACKAGE_(kmod-batman-adv|batctl-full|batctl-tiny|luci-proto-batman-adv)=y$' \
+          .config; then
+
+          echo "ERROR: BATMAN package is enabled!"
+          grep -E \
+            '^CONFIG_PACKAGE_(kmod-batman-adv|batctl-full|batctl-tiny|luci-proto-batman-adv)=' \
+            .config || true
+
+          exit 1
+        fi
+
+        echo "OK: BATMAN packages disabled"
+
+        if grep -q '^CONFIG_PACKAGE_wpad-mesh-openssl=y$' .config; then
+          echo "ERROR: wpad-mesh-openssl is enabled!"
+          exit 1
+        fi
+
+        echo "OK: Mesh WiFi disabled"
 
 
     # ============================================================
@@ -292,6 +344,9 @@ jobs:
             exit 1
           }
 
+        echo "OK: NSS/SQM configuration"
+
+
         echo
         echo "===== VERIFY NORMAL WIFI ====="
 
@@ -304,14 +359,27 @@ jobs:
 
         echo "OK: normal wpad-openssl available"
 
-        if grep -Eq '^CONFIG_PACKAGE_wpad-mesh-openssl=y$' .config; then
-          echo
+
+        echo
+        echo "===== VERIFY NO MESH ====="
+
+        if grep -Eq \
+          '^CONFIG_PACKAGE_wpad-mesh-openssl=y$' \
+          .config; then
+
           echo "ERROR: wpad-mesh-openssl is ENABLED!"
-          echo "Mesh configuration must NOT be included in this build."
           exit 1
         fi
 
-        echo "OK: wpad-mesh-openssl disabled"
+        if grep -Eq \
+          '^CONFIG_PACKAGE_(kmod-batman-adv|batctl-full|batctl-tiny|luci-proto-batman-adv)=y$' \
+          .config; then
+
+          echo "ERROR: BATMAN package is ENABLED!"
+          exit 1
+        fi
+
+        echo "OK: BATMAN / Mesh disabled"
 
         echo
         echo "===== NSS / WIFI CONFIG OK ====="
@@ -323,8 +391,94 @@ jobs:
 
     - name: Apply custom files
       run: |
+        echo "===== APPLYING CUSTOM FILES ====="
+
         mkdir -p openwrt/files
-        cp -a files/. openwrt/files/
+
+        if [ -d "files" ]; then
+          cp -a files/. openwrt/files/
+        fi
+
+        echo "Custom files copied."
+
+
+    # ============================================================
+    # REMOVE BATMAN / MESH DASHBOARD
+    # ============================================================
+
+    - name: Remove BATMAN / Mesh leftovers
+      run: |
+        echo "===== CLEANING BATMAN / MESH LEFTOVERS ====="
+
+        # Konkretne stare pliki dashboardu
+        rm -f \
+          openwrt/files/www/luci-static/resources/view/mesh/batman.js
+
+        rm -f \
+          openwrt/files/usr/share/luci/menu.d/luci-app-mesh-batman.json
+
+        rm -f \
+          openwrt/files/usr/libexec/rpcd/luci.batman-dashboard
+
+        # Stare kontrolery / widoki BATMAN
+        rm -rf \
+          openwrt/files/usr/lib/lua/luci/controller/mesh
+
+        rm -rf \
+          openwrt/files/usr/lib/lua/luci/view/mesh
+
+        # Usuń puste katalogi po czyszczeniu
+        find openwrt/files \
+          -type d \
+          -empty \
+          -delete \
+          2>/dev/null || true
+
+        echo
+        echo "===== SEARCHING FOR BATMAN FILES ====="
+
+        if find openwrt/files \
+          -type f \
+          \( \
+            -iname '*batman*' \
+            -o -iname '*batctl*' \
+          \) \
+          -print | grep -q .; then
+
+          echo
+          echo "ERROR: BATMAN leftovers still exist:"
+          find openwrt/files \
+            -type f \
+            \( \
+              -iname '*batman*' \
+              -o -iname '*batctl*' \
+            \) \
+            -print
+
+          exit 1
+        fi
+
+        echo "OK: no BATMAN files found"
+
+
+        echo
+        echo "===== SEARCHING FOR MESH WIFI FILES ====="
+
+        if find openwrt/files \
+          -type f \
+          -iname '*wpad-mesh*' \
+          -print | grep -q .; then
+
+          echo "ERROR: wpad-mesh files found:"
+          find openwrt/files \
+            -type f \
+            -iname '*wpad-mesh*' \
+            -print
+
+          exit 1
+        fi
+
+        echo "OK: no wpad-mesh files found"
 
 
     # ============================================================
@@ -333,8 +487,11 @@ jobs:
 
     - name: Remove old Lua LuCI files
       run: |
-        rm -rf openwrt/files/usr/lib/lua/luci/controller/dlwrx36.lua || true
-        rm -rf openwrt/files/usr/lib/lua/luci/view/dlwrx36 || true
+        rm -rf \
+          openwrt/files/usr/lib/lua/luci/controller/dlwrx36.lua || true
+
+        rm -rf \
+          openwrt/files/usr/lib/lua/luci/view/dlwrx36 || true
 
 
     # ============================================================
@@ -385,6 +542,9 @@ jobs:
 
         Mesh:
         DISABLED
+
+        BATMAN:
+        DISABLED
         EOF
 
         echo "===== BUILD INFORMATION ====="
@@ -405,29 +565,30 @@ jobs:
 
         cat > files/etc/banner <<EOF
 
-         ██████╗ ██╗    - WRX36
-         ██╔══██╗██║
-         ██║  ██║██║
-         ██║  ██║██║
-         ██████╔╝███████╗
-         ╚═════╝ ╚══════╝
+        ██████╗ ██╗    - WRX36
+        ██╔══██╗██║
+        ██║  ██║██║
+        ██║  ██║██║
+        ██████╔╝███████╗
+        ╚═════╝ ╚══════╝
 
-         Dynalink DL-WRX36
-         ================================
+        Dynalink DL-WRX36
+        ================================
 
-         NSS / ECM        : ENABLED
-         NSS Qdisc        : ENABLED
-         SQM NSS          : ENABLED
-         NSS IGS          : ENABLED
+        NSS / ECM        : ENABLED
+        NSS Qdisc        : ENABLED
+        SQM NSS          : ENABLED
+        NSS IGS          : ENABLED
 
-         WiFi             : WPA/OPENSSL
-         Mesh             : DISABLED
+        WiFi             : WPA/OPENSSL
+        Mesh             : DISABLED
+        BATMAN           : DISABLED
 
-         Build            : ${{ github.run_number }}
-         Date             : ${BUILD_DATE}
-         Commit           : ${OPENWRT_COMMIT}
+        Build            : ${{ github.run_number }}
+        Date             : ${BUILD_DATE}
+        Commit           : ${OPENWRT_COMMIT}
 
-         ================================
+        ================================
 
         EOF
 
@@ -454,12 +615,49 @@ jobs:
 
     - name: Verify LuCI files
       run: |
-        echo "Checking DL-WRX36 dashboard"
+        echo "===== CHECKING DL-WRX36 DASHBOARD ====="
 
-        test -f files/www/luci-static/resources/view/dlwrx36/nss.js
-        test -f files/usr/libexec/rpcd/luci.nss-dashboard
+        test -f \
+          files/www/luci-static/resources/view/dlwrx36/nss.js
 
-        echo "OK: dashboard files present"
+        test -f \
+          files/usr/libexec/rpcd/luci.nss-dashboard
+
+        echo "OK: DL-WRX36 dashboard files present"
+
+
+    # ============================================================
+    # FINAL BATMAN FILE CHECK
+    # ============================================================
+
+    - name: Final BATMAN / Mesh safety check
+      run: |
+        echo "===== FINAL SAFETY CHECK ====="
+
+        if find openwrt/files \
+          -type f \
+          \( \
+            -iname '*batman*' \
+            -o -iname '*batctl*' \
+            -o -iname '*wpad-mesh*' \
+          \) \
+          -print | grep -q .; then
+
+          echo
+          echo "ERROR: forbidden BATMAN/MESH files found:"
+          find openwrt/files \
+            -type f \
+            \( \
+              -iname '*batman*' \
+              -o -iname '*batctl*' \
+              -o -iname '*wpad-mesh*' \
+            \) \
+            -print
+
+          exit 1
+        fi
+
+        echo "OK: firmware custom files contain no BATMAN/MESH leftovers"
 
 
     # ============================================================
@@ -554,7 +752,8 @@ jobs:
       run: |
         echo "===== BUILD OUTPUT ====="
 
-        ls -lah openwrt/bin/targets/${{ env.TARGET }}/
+        ls -lah \
+          openwrt/bin/targets/${{ env.TARGET }}/
 
         echo
         echo "===== FIRMWARE FILES ====="
@@ -614,7 +813,8 @@ jobs:
             -name '*sysupgrade*' \
             -o -name '*factory*' \
           \) \
-          -exec sha256sum {} \; > artifacts/sha256sums.txt
+          -exec sha256sum {} \; \
+          > artifacts/sha256sums.txt
 
         echo "===== SHA256 ====="
         cat artifacts/sha256sums.txt
@@ -694,6 +894,9 @@ jobs:
           - Standard WPA/OpenSSL WiFi
 
           Mesh:
+          - DISABLED
+
+          BATMAN:
           - DISABLED
 
           ==================================
