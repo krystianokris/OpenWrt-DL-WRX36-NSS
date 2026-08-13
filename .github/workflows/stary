@@ -1,0 +1,922 @@
+name: Build DL-WRX36 NSS
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  OPENWRT_REPO: https://github.com/krystianokris/openwrt.git
+  OPENWRT_BRANCH: dl-wrx36-nss
+  TARGET: qualcommax/ipq807x
+
+  # Zmień na v2/v3 itd. tylko gdy chcesz wymusić całkowicie nowy cache.
+  CACHE_VERSION: v1
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+
+    steps:
+
+    # ============================================================
+    # CHECKOUT
+    # ============================================================
+
+    - name: Checkout
+      uses: actions/checkout@v4
+
+
+    # ============================================================
+    # FREE DISK SPACE
+    # ============================================================
+
+    - name: Free disk space
+      run: |
+        echo "===== DISK BEFORE ====="
+        df -h
+
+        sudo rm -rf /usr/local/lib/android
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf /usr/local/share/boost
+
+        sudo docker image prune -a -f || true
+        sudo docker system prune -af || true
+
+        sudo apt clean
+
+        echo
+        echo "===== DISK AFTER ====="
+        df -h
+
+
+    # ============================================================
+    # DEPENDENCIES
+    # ============================================================
+
+    - name: Install dependencies
+      run: |
+        sudo apt update
+
+        sudo apt install -y \
+          build-essential \
+          clang \
+          flex \
+          bison \
+          g++ \
+          gawk \
+          gcc-multilib \
+          gettext \
+          git \
+          libncurses-dev \
+          libssl-dev \
+          python3 \
+          rsync \
+          unzip \
+          zlib1g-dev \
+          file \
+          ccache
+
+
+    # ============================================================
+    # CLONE OPENWRT NSS
+    # ============================================================
+
+    - name: Clone OpenWrt NSS
+      run: |
+        rm -rf openwrt
+
+        git clone \
+          --branch "${{ env.OPENWRT_BRANCH }}" \
+          "${{ env.OPENWRT_REPO }}" \
+          openwrt
+
+        cd openwrt
+
+        echo "===== OPENWRT SOURCE ====="
+        echo "Repository: ${{ env.OPENWRT_REPO }}"
+        echo "Branch:     ${{ env.OPENWRT_BRANCH }}"
+        echo
+
+        echo "Current commit:"
+        git rev-parse HEAD
+
+        echo
+        echo "Last commits:"
+        git log --oneline -5
+
+
+    # ============================================================
+    # PIN COMMIT
+    # ============================================================
+
+    - name: Save pinned commit
+      working-directory: openwrt
+      run: |
+        git rev-parse HEAD > ../pinned-commit.txt
+
+        echo "===== PINNED COMMIT ====="
+        cat ../pinned-commit.txt
+
+
+    # ============================================================
+    # CACHE CCACHE
+    # ============================================================
+
+    - name: Cache ccache
+      uses: actions/cache@v4
+      with:
+        path: ~/.ccache
+        key: dlwrx36-${{ env.CACHE_VERSION }}-ccache-${{ hashFiles('configs/dl-wrx36.config', 'files/**', 'patches/**', 'scripts/**') }}
+        restore-keys: |
+          dlwrx36-${{ env.CACHE_VERSION }}-ccache-
+
+
+    # ============================================================
+    # CACHE OPENWRT DOWNLOADS
+    # ============================================================
+
+    - name: Cache OpenWrt downloads
+      uses: actions/cache@v4
+      with:
+        path: openwrt/dl
+        key: dlwrx36-${{ env.CACHE_VERSION }}-dl-${{ hashFiles('configs/dl-wrx36.config') }}
+        restore-keys: |
+          dlwrx36-${{ env.CACHE_VERSION }}-dl-
+
+
+    # ============================================================
+    # CLEAN OPENWRT STATE
+    # ============================================================
+
+    - name: Clean OpenWrt state
+      working-directory: openwrt
+      run: |
+        rm -rf tmp
+        rm -rf feeds
+        rm -f .config
+
+        echo "===== OPENWRT STATE CLEANED ====="
+
+
+    # ============================================================
+    # PATCH APK FEED GENERATION
+    # ============================================================
+
+    - name: Patch APK feed generation
+      working-directory: openwrt
+      run: |
+        python3 - <<'PY'
+        from pathlib import Path
+
+        p = Path("include/feeds.mk")
+        s = p.read_text()
+
+        marker = "define FeedSourcesAppendAPK"
+
+        if marker not in s:
+            raise SystemExit("ERROR: FeedSourcesAppendAPK definition not found")
+
+        start = s.index(marker)
+        end = s.index("endef", start) + len("endef")
+
+        new_block = r'''define FeedSourcesAppendAPK
+        ( \
+          echo '# This file is auto-generated and build-specific, any changes will be intentionally lost in sysupgrade.'; \
+          echo '# Add your custom feeds to /etc/apk/repositories.d/customfeeds.list'; \
+          echo '%U/packages/%A/base/packages.adb'; \
+          $(if $(CONFIG_BUILDBOT), \
+            echo '%U/targets/%S/kmods/$(LINUX_VERSION)-$(LINUX_RELEASE)-$(LINUX_VERMAGIC)/packages.adb'; \
+          ) \
+          $(foreach feed,$(FEEDS_AVAILABLE), \
+            $(if $(CONFIG_FEED_$(feed)), \
+              echo '%U/packages/%A/$(feed)/packages.adb'; \
+            ) \
+          ) \
+        ) >> $(1)
+        endef'''
+
+        p.write_text(s[:start] + new_block + s[end:])
+        PY
+
+        echo "===== FINAL APK FEED GENERATOR ====="
+        sed -n '/define FeedSourcesAppendAPK/,/endef/p' include/feeds.mk
+
+
+    # ============================================================
+    # UPDATE FEEDS
+    # ============================================================
+
+    - name: Update feeds
+      working-directory: openwrt
+      run: |
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
+
+
+    # ============================================================
+    # IMPORT CONFIG
+    # ============================================================
+
+    - name: Import NSS config
+      working-directory: openwrt
+      run: |
+        cp ../configs/dl-wrx36.config .config
+
+        echo "===== RUNNING DEFCONFIG ====="
+
+        make defconfig
+
+
+    # ============================================================
+    # FORCE NORMAL WIFI / DISABLE MESH
+    # ============================================================
+
+    - name: Enforce normal WiFi configuration
+      working-directory: openwrt
+      run: |
+        echo "===== ENFORCING NORMAL WIFI ====="
+
+        sed -i '/^CONFIG_PACKAGE_wpad-mesh-openssl=/d' .config
+        sed -i '/^CONFIG_PACKAGE_wpad-openssl=/d' .config
+
+        echo 'CONFIG_PACKAGE_wpad-openssl=y' >> .config
+
+        make defconfig
+
+        echo
+        echo "===== FINAL WIFI CONFIG ====="
+
+        grep -E \
+          '^CONFIG_PACKAGE_(wpad|hostapd)' \
+          .config || true
+
+
+    # ============================================================
+    # FORCE BATMAN OFF
+    # ============================================================
+
+    - name: Enforce BATMAN / Mesh disabled
+      working-directory: openwrt
+      run: |
+        echo "===== DISABLING BATMAN / MESH ====="
+
+        sed -i '/^CONFIG_PACKAGE_kmod-batman-adv=/d' .config
+        sed -i '/^CONFIG_PACKAGE_batctl-full=/d' .config
+        sed -i '/^CONFIG_PACKAGE_batctl-tiny=/d' .config
+        sed -i '/^CONFIG_PACKAGE_luci-proto-batman-adv=/d' .config
+
+        echo 'CONFIG_PACKAGE_kmod-batman-adv=n' >> .config
+        echo 'CONFIG_PACKAGE_batctl-full=n' >> .config
+        echo 'CONFIG_PACKAGE_batctl-tiny=n' >> .config
+        echo 'CONFIG_PACKAGE_luci-proto-batman-adv=n' >> .config
+
+        make defconfig
+
+        echo
+        echo "===== BATMAN CONFIG CHECK ====="
+
+        if grep -Eq \
+          '^CONFIG_PACKAGE_(kmod-batman-adv|batctl-full|batctl-tiny|luci-proto-batman-adv)=y$' \
+          .config; then
+
+          echo "ERROR: BATMAN package is enabled!"
+          grep -E \
+            '^CONFIG_PACKAGE_(kmod-batman-adv|batctl-full|batctl-tiny|luci-proto-batman-adv)=' \
+            .config || true
+
+          exit 1
+        fi
+
+        echo "OK: BATMAN packages disabled"
+
+        if grep -q '^CONFIG_PACKAGE_wpad-mesh-openssl=y$' .config; then
+          echo "ERROR: wpad-mesh-openssl is enabled!"
+          exit 1
+        fi
+
+        echo "OK: Mesh WiFi disabled"
+
+
+    # ============================================================
+    # VERIFY IMPORTANT CONFIG
+    # ============================================================
+
+    - name: Verify NSS configuration
+      working-directory: openwrt
+      run: |
+        echo "===== NSS / SQM CONFIG ====="
+
+        grep -E \
+          '^CONFIG_PACKAGE_(sqm-scripts-nss|kmod-qca-nss-drv-qdisc|kmod-qca-nss-drv-igs)=' \
+          .config || true
+
+        echo
+        echo "===== WIFI CONFIG ====="
+
+        grep -E \
+          '^CONFIG_PACKAGE_(wpad|hostapd)' \
+          .config || true
+
+        echo
+        echo "===== VERIFY SQM NSS ====="
+
+        grep -Eq \
+          '^CONFIG_PACKAGE_sqm-scripts-nss=y$' \
+          .config || {
+            echo "ERROR: sqm-scripts-nss is NOT enabled!"
+            exit 1
+          }
+
+        grep -Eq \
+          '^CONFIG_PACKAGE_kmod-qca-nss-drv-qdisc=y$' \
+          .config || {
+            echo "ERROR: NSS qdisc is NOT enabled!"
+            exit 1
+          }
+
+        grep -Eq \
+          '^CONFIG_PACKAGE_kmod-qca-nss-drv-igs=y$' \
+          .config || {
+            echo "ERROR: NSS IGS is NOT enabled!"
+            exit 1
+          }
+
+        echo "OK: NSS/SQM configuration"
+
+
+        echo
+        echo "===== VERIFY NORMAL WIFI ====="
+
+        grep -Eq \
+          '^CONFIG_PACKAGE_wpad-openssl=(y|m)$' \
+          .config || {
+            echo "ERROR: normal wpad-openssl is NOT enabled!"
+            exit 1
+          }
+
+        echo "OK: normal wpad-openssl available"
+
+
+        echo
+        echo "===== VERIFY NO MESH ====="
+
+        if grep -Eq \
+          '^CONFIG_PACKAGE_wpad-mesh-openssl=y$' \
+          .config; then
+
+          echo "ERROR: wpad-mesh-openssl is ENABLED!"
+          exit 1
+        fi
+
+        if grep -Eq \
+          '^CONFIG_PACKAGE_(kmod-batman-adv|batctl-full|batctl-tiny|luci-proto-batman-adv)=y$' \
+          .config; then
+
+          echo "ERROR: BATMAN package is ENABLED!"
+          exit 1
+        fi
+
+        echo "OK: BATMAN / Mesh disabled"
+
+        echo
+        echo "===== NSS / WIFI CONFIG OK ====="
+
+
+    # ============================================================
+    # APPLY CUSTOM FILES
+    # ============================================================
+
+    - name: Apply custom files
+      run: |
+        echo "===== APPLYING CUSTOM FILES ====="
+
+        mkdir -p openwrt/files
+
+        if [ -d "files" ]; then
+          cp -a files/. openwrt/files/
+        fi
+
+        echo "Custom files copied."
+
+
+    # ============================================================
+    # REMOVE BATMAN / MESH DASHBOARD
+    # ============================================================
+
+    - name: Remove BATMAN / Mesh leftovers
+      run: |
+        echo "===== CLEANING BATMAN / MESH LEFTOVERS ====="
+
+        # Konkretne stare pliki dashboardu
+        rm -f \
+          openwrt/files/www/luci-static/resources/view/mesh/batman.js
+
+        rm -f \
+          openwrt/files/usr/share/luci/menu.d/luci-app-mesh-batman.json
+
+        rm -f \
+          openwrt/files/usr/libexec/rpcd/luci.batman-dashboard
+
+        # Stare kontrolery / widoki BATMAN
+        rm -rf \
+          openwrt/files/usr/lib/lua/luci/controller/mesh
+
+        rm -rf \
+          openwrt/files/usr/lib/lua/luci/view/mesh
+
+        # Usuń puste katalogi po czyszczeniu
+        find openwrt/files \
+          -type d \
+          -empty \
+          -delete \
+          2>/dev/null || true
+
+        echo
+        echo "===== SEARCHING FOR BATMAN FILES ====="
+
+        if find openwrt/files \
+          -type f \
+          \( \
+            -iname '*batman*' \
+            -o -iname '*batctl*' \
+          \) \
+          -print | grep -q .; then
+
+          echo
+          echo "ERROR: BATMAN leftovers still exist:"
+          find openwrt/files \
+            -type f \
+            \( \
+              -iname '*batman*' \
+              -o -iname '*batctl*' \
+            \) \
+            -print
+
+          exit 1
+        fi
+
+        echo "OK: no BATMAN files found"
+
+
+        echo
+        echo "===== SEARCHING FOR MESH WIFI FILES ====="
+
+        if find openwrt/files \
+          -type f \
+          -iname '*wpad-mesh*' \
+          -print | grep -q .; then
+
+          echo "ERROR: wpad-mesh files found:"
+          find openwrt/files \
+            -type f \
+            -iname '*wpad-mesh*' \
+            -print
+
+          exit 1
+        fi
+
+        echo "OK: no wpad-mesh files found"
+
+
+    # ============================================================
+    # REMOVE OLD LUA LUCi FILES
+    # ============================================================
+
+    - name: Remove old Lua LuCI files
+      run: |
+        rm -rf \
+          openwrt/files/usr/lib/lua/luci/controller/dlwrx36.lua || true
+
+        rm -rf \
+          openwrt/files/usr/lib/lua/luci/view/dlwrx36 || true
+
+
+    # ============================================================
+    # CREATE BUILD INFORMATION
+    # ============================================================
+
+    - name: Create build information
+      working-directory: openwrt
+      run: |
+        BUILD_DATE="$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+        OPENWRT_COMMIT="$(git rev-parse HEAD)"
+
+        mkdir -p files/etc
+
+        cat > files/etc/dl-wrx36-build <<EOF
+        DL-WRX36 NSS BUILD
+
+        Build number: ${{ github.run_number }}
+        Build ID: ${{ github.run_id }}
+
+        Build date:
+        ${BUILD_DATE}
+
+        OpenWrt repository:
+        ${{ env.OPENWRT_REPO }}
+
+        OpenWrt branch:
+        ${{ env.OPENWRT_BRANCH }}
+
+        OpenWrt commit:
+        ${OPENWRT_COMMIT}
+
+        Target:
+        ${{ env.TARGET }}
+
+        Features:
+        Qualcomm NSS
+        ECM
+        ath11k NSS offload
+        NSS qdisc
+        SQM NSS
+        NSS IGS
+        Custom LuCI dashboard
+
+        WiFi:
+        wpad-openssl
+        hostapd-openssl
+
+        Mesh:
+        DISABLED
+
+        BATMAN:
+        DISABLED
+        EOF
+
+        echo "===== BUILD INFORMATION ====="
+        cat files/etc/dl-wrx36-build
+
+
+    # ============================================================
+    # CREATE DYNAMIC BANNER
+    # ============================================================
+
+    - name: Create dynamic banner
+      working-directory: openwrt
+      run: |
+        BUILD_DATE="$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+        OPENWRT_COMMIT="$(git rev-parse --short HEAD)"
+
+        mkdir -p files/etc
+
+        cat > files/etc/banner <<EOF
+
+        ██████╗ ██╗    - WRX36
+        ██╔══██╗██║
+        ██║  ██║██║
+        ██║  ██║██║
+        ██████╔╝███████╗
+        ╚═════╝ ╚══════╝
+
+        Dynalink DL-WRX36
+        ================================
+
+        NSS / ECM        : ENABLED
+        NSS Qdisc        : ENABLED
+        SQM NSS          : ENABLED
+        NSS IGS          : ENABLED
+
+        WiFi             : WPA/OPENSSL
+        Mesh             : DISABLED
+        BATMAN           : DISABLED
+
+        Build            : ${{ github.run_number }}
+        Date             : ${BUILD_DATE}
+        Commit           : ${OPENWRT_COMMIT}
+
+        ================================
+
+        EOF
+
+        echo "===== BANNER ====="
+        cat files/etc/banner
+
+
+    # ============================================================
+    # CONFIGURE OPENWRT
+    # ============================================================
+
+    - name: Configure OpenWrt
+      working-directory: openwrt
+      run: |
+        ./scripts/diffconfig.sh > ../diffconfig.txt
+
+        echo "===== DIFFCONFIG ====="
+        cat ../diffconfig.txt
+
+
+    # ============================================================
+    # VERIFY LUCi FILES
+    # ============================================================
+
+    - name: Verify LuCI files
+      run: |
+        echo "===== CHECKING DL-WRX36 DASHBOARD ====="
+
+        test -f \
+          files/www/luci-static/resources/view/dlwrx36/nss.js
+
+        test -f \
+          files/usr/libexec/rpcd/luci.nss-dashboard
+
+        echo "OK: DL-WRX36 dashboard files present"
+
+
+    # ============================================================
+    # FINAL BATMAN FILE CHECK
+    # ============================================================
+
+    - name: Final BATMAN / Mesh safety check
+      run: |
+        echo "===== FINAL SAFETY CHECK ====="
+
+        if find openwrt/files \
+          -type f \
+          \( \
+            -iname '*batman*' \
+            -o -iname '*batctl*' \
+            -o -iname '*wpad-mesh*' \
+          \) \
+          -print | grep -q .; then
+
+          echo
+          echo "ERROR: forbidden BATMAN/MESH files found:"
+          find openwrt/files \
+            -type f \
+            \( \
+              -iname '*batman*' \
+              -o -iname '*batctl*' \
+              -o -iname '*wpad-mesh*' \
+            \) \
+            -print
+
+          exit 1
+        fi
+
+        echo "OK: firmware custom files contain no BATMAN/MESH leftovers"
+
+
+    # ============================================================
+    # DOWNLOAD SOURCES
+    # ============================================================
+
+    - name: Download sources
+      working-directory: openwrt
+      run: |
+        make download V=s
+
+
+    # ============================================================
+    # BUILD TOOLS
+    # ============================================================
+
+    - name: Build tools
+      working-directory: openwrt
+      run: |
+        export PATH="/usr/lib/ccache:$PATH"
+        export CCACHE_DIR="$HOME/.ccache"
+
+        ccache -M 10G
+
+        echo "===== BUILD TOOLS ====="
+
+        make tools/install -j$(nproc) V=s
+
+
+    # ============================================================
+    # BUILD TOOLCHAIN
+    # ============================================================
+
+    - name: Build toolchain
+      working-directory: openwrt
+      run: |
+        export PATH="/usr/lib/ccache:$PATH"
+        export CCACHE_DIR="$HOME/.ccache"
+
+        echo "===== BUILD TOOLCHAIN ====="
+
+        make toolchain/install -j$(nproc) V=s
+
+
+    # ============================================================
+    # BUILD FIRMWARE
+    # ============================================================
+
+    - name: Build firmware
+      working-directory: openwrt
+      env:
+        CONFIG_CCACHE: 1
+      run: |
+        export PATH="/usr/lib/ccache:$PATH"
+        export CCACHE_DIR="$HOME/.ccache"
+
+        ccache -M 10G
+
+        echo "===== CCACHE BEFORE BUILD ====="
+        ccache -s
+
+        echo
+        echo "===== BUILD FIRMWARE ====="
+
+        make -j$(nproc) V=s
+
+        echo
+        echo "===== CCACHE AFTER BUILD ====="
+        ccache -s
+
+
+    # ============================================================
+    # SHOW REJECTED PATCHES IF BUILD FAILS
+    # ============================================================
+
+    - name: Show rejected patch hunks on failure
+      if: failure()
+      run: |
+        echo "===== REJECTED PATCHES ====="
+
+        find openwrt \
+          -name "*.rej" \
+          -print \
+          -exec cat {} \; || true
+
+
+    # ============================================================
+    # VERIFY BUILD OUTPUT
+    # ============================================================
+
+    - name: Verify firmware output
+      run: |
+        echo "===== BUILD OUTPUT ====="
+
+        ls -lah \
+          openwrt/bin/targets/${{ env.TARGET }}/
+
+        echo
+        echo "===== FIRMWARE FILES ====="
+
+        find openwrt/bin/targets/${{ env.TARGET }} \
+          -maxdepth 2 \
+          -type f \
+          \( \
+            -name '*sysupgrade*' \
+            -o -name '*factory*' \
+            -o -name '*.manifest' \
+            -o -name '*.itb' \
+            -o -name '*.bin' \
+          \) \
+          -print
+
+        test -n "$(find openwrt/bin/targets/${{ env.TARGET }} \
+          -maxdepth 2 \
+          -type f \
+          -name '*sysupgrade*' \
+          -print -quit)"
+
+        echo
+        echo "===== FIRMWARE OUTPUT OK ====="
+
+
+    # ============================================================
+    # CHECK FIRMWARE SIZE
+    # ============================================================
+
+    - name: Check firmware size
+      run: |
+        echo "===== FIRMWARE SIZE ====="
+
+        find openwrt/bin/targets/${{ env.TARGET }} \
+          -maxdepth 2 \
+          -type f \
+          -name '*sysupgrade*' \
+          -exec ls -lh {} \;
+
+        echo
+        echo "Firmware size check completed."
+
+
+    # ============================================================
+    # SHA256
+    # ============================================================
+
+    - name: Generate SHA256
+      run: |
+        mkdir -p artifacts
+
+        find openwrt/bin/targets/${{ env.TARGET }} \
+          -maxdepth 2 \
+          -type f \
+          \( \
+            -name '*sysupgrade*' \
+            -o -name '*factory*' \
+          \) \
+          -exec sha256sum {} \; \
+          > artifacts/sha256sums.txt
+
+        echo "===== SHA256 ====="
+        cat artifacts/sha256sums.txt
+
+
+    # ============================================================
+    # PREPARE ARTIFACTS
+    # ============================================================
+
+    - name: Prepare artifacts
+      run: |
+        mkdir -p artifacts
+
+        cp openwrt/bin/targets/${{ env.TARGET }}/*sysupgrade* \
+          artifacts/ || true
+
+        cp openwrt/bin/targets/${{ env.TARGET }}/*factory* \
+          artifacts/ || true
+
+        cp openwrt/bin/targets/${{ env.TARGET }}/*.manifest \
+          artifacts/ || true
+
+        cp diffconfig.txt \
+          artifacts/ || true
+
+        cp openwrt/files/etc/dl-wrx36-build \
+          artifacts/ || true
+
+        cp openwrt/files/etc/banner \
+          artifacts/ || true
+
+        cp pinned-commit.txt \
+          artifacts/ || true
+
+        echo
+        echo "===== ARTIFACTS ====="
+        ls -lah artifacts/
+
+
+    # ============================================================
+    # UPLOAD ARTIFACTS
+    # ============================================================
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: DL-WRX36-NSS-${{ github.run_number }}
+        path: artifacts/
+
+
+    # ============================================================
+    # RELEASE
+    # ============================================================
+
+    - name: Release
+      uses: softprops/action-gh-release@v2
+      if: success()
+      with:
+        tag_name: dl-wrx36-${{ github.run_number }}
+        name: DL-WRX36 NSS Build ${{ github.run_number }}
+
+        body: |
+          DL-WRX36 NSS Build
+
+          ==================================
+
+          Features:
+          - Qualcomm NSS acceleration
+          - ECM acceleration
+          - ath11k NSS offload
+          - NSS qdisc
+          - SQM NSS scripts
+          - NSS IGS
+          - ECM dashboard
+          - NSS dashboard
+          - Native LuCI JS interface
+          - Standard WPA/OpenSSL WiFi
+
+          Mesh:
+          - DISABLED
+
+          BATMAN:
+          - DISABLED
+
+          ==================================
+
+          Source:
+          ${{ env.OPENWRT_REPO }}
+
+          Branch:
+          ${{ env.OPENWRT_BRANCH }}
+
+          Build:
+          GitHub Actions run ${{ github.run_number }}
+
+          Commit:
+          See pinned-commit.txt
+
+          SHA256:
+          See sha256sums.txt
+
+        files: artifacts/*
+
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
