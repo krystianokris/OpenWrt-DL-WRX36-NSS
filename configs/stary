@@ -1,0 +1,81 @@
+CONFIG_TARGET_qualcommax=y
+CONFIG_TARGET_qualcommax_ipq807x=y
+CONFIG_TARGET_qualcommax_ipq807x_DEVICE_dynalink_dl-wrx36=y
+
+#
+# LuCI
+#
+CONFIG_PACKAGE_luci=y
+CONFIG_PACKAGE_luci-ssl-openssl=y
+CONFIG_PACKAGE_luci-theme-openwrt-2020=y
+
+#
+# WiFi
+#
+CONFIG_PACKAGE_wpad-openssl=y
+CONFIG_PACKAGE_hostapd-openssl=y
+CONFIG_PACKAGE_iwinfo=y
+
+CONFIG_PACKAGE_kmod-ath11k=y
+CONFIG_PACKAGE_kmod-ath11k-ahb=y
+
+#
+# NSS
+#
+CONFIG_PACKAGE_nss-firmware=y
+CONFIG_PACKAGE_nss-firmware-ipq807x=y
+
+CONFIG_PACKAGE_kmod-qca-nss-dp=y
+CONFIG_PACKAGE_kmod-qca-nss-drv=y
+CONFIG_PACKAGE_kmod-qca-nss-ecm=y
+
+CONFIG_PACKAGE_kmod-qca-nss-bridge=y
+CONFIG_PACKAGE_kmod-qca-nss-vlan=y
+
+CONFIG_PACKAGE_kmod-qca-nss-drv-bridge-mgr=y
+CONFIG_PACKAGE_kmod-qca-nss-drv-igs=y
+CONFIG_PACKAGE_kmod-qca-nss-drv-pppoe=y
+CONFIG_PACKAGE_kmod-qca-nss-drv-vlan-mgr=y
+
+CONFIG_PACKAGE_kmod-qca-ssdk=y
+
+#
+# PPPoE
+#
+CONFIG_PACKAGE_ppp=y
+CONFIG_PACKAGE_ppp-mod-pppoe=y
+CONFIG_PACKAGE_luci-proto-ppp=y
+
+#
+# Utilities
+#
+CONFIG_PACKAGE_htop=y
+CONFIG_PACKAGE_curl=y
+CONFIG_PACKAGE_ethtool=y
+CONFIG_PACKAGE_iperf3=y
+CONFIG_PACKAGE_tcpdump=y
+CONFIG_PACKAGE_irqbalance=y
+
+CONFIG_PACKAGE_kmod-qca-nss-drv-qdisc=y
+
+CONFIG_PACKAGE_sqm-scripts-nss=y
+
+CONFIG_PACKAGE_tc-full=y
+CONFIG_PACKAGE_ip-full=y
+CONFIG_PACKAGE_kmod-sched-core=y
+CONFIG_PACKAGE_kmod-sched=y
+CONFIG_PACKAGE_kmod-ifb=y
+
+CONFIG_PER_FEED_REPO=y
+CONFIG_FEED_packages=y
+CONFIG_FEED_luci=y
+CONFIG_FEED_routing=y
+CONFIG_FEED_telephony=y
+CONFIG_FEED_video=y
+# CONFIG_FEED_nss_packages is not set
+# CONFIG_FEED_sqm_scripts_nss_julius is not set
+# CONFIG_FEED_qosmio is not set
+
+# Roaming
+CONFIG_PACKAGE_usteer=y
+CONFIG_PACKAGE_luci-app-usteer=y
