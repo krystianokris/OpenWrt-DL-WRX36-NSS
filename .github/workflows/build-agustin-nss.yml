@@ -132,47 +132,7 @@ jobs:
         
         if grep -q "CONFIG_USE_APK=y" ../configs/dl-wrx36.config 2>/dev/null; then
           echo "📦 APK detected - patching feeds"
-          
-          cat > patch_apk.py << 'EOF'
-          from pathlib import Path
-          
-          p = Path("include/feeds.mk")
-          if not p.exists():
-              print("WARNING: feeds.mk not found")
-              exit(0)
-          
-          content = p.read_text()
-          marker = "define FeedSourcesAppendAPK"
-          
-          if marker not in content:
-              print("INFO: APK feed definition not found")
-              exit(0)
-          
-          start = content.index(marker)
-          end = content.index("endef", start) + len("endef")
-          
-          new_block = '''define FeedSourcesAppendAPK
-          ( \\
-            echo '# This file is auto-generated and build-specific, any changes will be intentionally lost in sysupgrade.'; \\
-            echo '# Add your custom feeds to /etc/apk/repositories.d/customfeeds.list'; \\
-            echo '%U/packages/%A/base/packages.adb'; \\
-            $(if $(CONFIG_BUILDBOT), \\
-              echo '%U/targets/%S/kmods/$(LINUX_VERSION)-$(LINUX_RELEASE)-$(LINUX_VERMAGIC)/packages.adb'; \\
-            ) \\
-            $(foreach feed,$(FEEDS_AVAILABLE), \\
-              $(if $(CONFIG_FEED_$(feed)), \\
-                echo '%U/packages/%A/$(feed)/packages.adb'; \\
-              ) \\
-            ) \\
-          ) >> $(1)
-          endef'''
-          
-          p.write_text(content[:start] + new_block + content[end:])
-          print("✅ APK feed patched")
-          EOF
-          
-          python3 patch_apk.py
-          rm -f patch_apk.py
+          python3 ../scripts/patch_apk.py
         else
           echo "📦 OPKG detected - no patch needed"
         fi
