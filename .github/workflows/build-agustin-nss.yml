@@ -32,22 +32,15 @@ env:
   
   # === BUDOWA ===
   CCACHE_MAX_SIZE: 10G
-  TIMEOUT_MINUTES: 180
   
   # === WERSJE ===
   CACHE_VERSION: v3
-  BUILD_VERSION: 2.0.0
-  
-  # === BEZPIECZEŃSTWO ===
-  DISABLE_BATMAN: true
-  DISABLE_MESH: true
 
 jobs:
   build:
     runs-on: ubuntu-24.04
-    timeout-minutes: ${{ env.TIMEOUT_MINUTES }}
+    timeout-minutes: 180  # Ustawione na sztywno, nie jako zmienna
     
-    # Matrix - budujemy warianty
     strategy:
       fail-fast: false
       matrix:
@@ -503,7 +496,7 @@ jobs:
         echo "✅ Checksums generated"
 
     # ============================================================
-    # KROK 20: WERYFIKUJ MANIFEST
+    # KROK 20: WERYFIKUJ MANIFEST (BEZPIECZEŃSTWO)
     # ============================================================
 
     - name: 🔒 Verify manifest
