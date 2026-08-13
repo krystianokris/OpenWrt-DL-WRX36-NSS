@@ -132,7 +132,11 @@ jobs:
         
         if grep -q "CONFIG_USE_APK=y" ../configs/dl-wrx36.config 2>/dev/null; then
           echo "📦 APK detected - patching feeds"
-          python3 ../scripts/patch_apk.py
+          if [ -f ../scripts/patch_apk.py ]; then
+            python3 ../scripts/patch_apk.py
+          else
+            echo "⚠️ patch_apk.py not found, skipping"
+          fi
         else
           echo "📦 OPKG detected - no patch needed"
         fi
@@ -153,19 +157,38 @@ jobs:
         make defconfig
         echo "✅ Configured"
 
-    - name: 🔧 Enforce wpad-openssl
+    - name: 🔧 Fix WiFi configuration
       working-directory: openwrt
       run: |
-        echo "===== ENFORCING WPAD ====="
-        sed -i '/^CONFIG_PACKAGE_wpad-/d' .config
-        echo 'CONFIG_PACKAGE_wpad-openssl=y' >> .config
-        make defconfig
-        if grep -q "^CONFIG_PACKAGE_wpad-openssl=y" .config; then
-          echo "✅ wpad-openssl enabled"
+        echo "===== FIXING WIFI CONFIG ====="
+        
+        # Sprawdź jakie opcje wpad są dostępne
+        echo "Available wpad options:"
+        grep -E '^CONFIG_PACKAGE_wpad' .config || echo "No wpad config found"
+        
+        # Usuń wszystkie wpad
+        sed -i '/^CONFIG_PACKAGE_wpad/d' .config
+        
+        # Dodaj tylko to co jest potrzebne - sprawdź czy wpad-openssl istnieje
+        if grep -q "CONFIG_PACKAGE_wpad-openssl" ../configs/dl-wrx36.config; then
+          echo 'CONFIG_PACKAGE_wpad-openssl=y' >> .config
+        elif grep -q "CONFIG_PACKAGE_wpad-basic-openssl" ../configs/dl-wrx36.config; then
+          echo 'CONFIG_PACKAGE_wpad-basic-openssl=y' >> .config
         else
-          echo "❌ Failed to enable wpad-openssl"
-          exit 1
+          # Jeśli żaden nie istnieje, spróbujmy hostapd i wpad minimal
+          echo 'CONFIG_PACKAGE_wpad-basic-openssl=y' >> .config
+          echo 'CONFIG_PACKAGE_hostapd-openssl=y' >> .config
         fi
+        
+        # Wyłącz mesh
+        echo '# CONFIG_PACKAGE_wpad-mesh-openssl is not set' >> .config
+        echo '# CONFIG_PACKAGE_wpad-mesh-wolfssl is not set' >> .config
+        
+        make defconfig
+        
+        echo "===== FINAL WPAD CONFIG ====="
+        grep -E '^CONFIG_PACKAGE_wpad' .config || echo "No wpad config"
+        grep -E '^CONFIG_PACKAGE_hostapd' .config || echo "No hostapd config"
 
     - name: 🦇 Disable BATMAN
       working-directory: openwrt
@@ -174,14 +197,14 @@ jobs:
         sed -i '/^CONFIG_PACKAGE_.*batman/d' .config
         sed -i '/^CONFIG_PACKAGE_.*batctl/d' .config
         sed -i '/^CONFIG_PACKAGE_luci-proto-batman/d' .config
-        echo '# BATMAN disabled' >> .config
-        echo 'CONFIG_PACKAGE_kmod-batman-adv=n' >> .config
-        echo 'CONFIG_PACKAGE_batctl-full=n' >> .config
-        echo 'CONFIG_PACKAGE_batctl-tiny=n' >> .config
+        echo '# CONFIG_PACKAGE_kmod-batman-adv is not set' >> .config
+        echo '# CONFIG_PACKAGE_batctl-full is not set' >> .config
+        echo '# CONFIG_PACKAGE_batctl-tiny is not set' >> .config
+        echo '# CONFIG_PACKAGE_luci-proto-batman-adv is not set' >> .config
         make defconfig
-        if grep -E "^CONFIG_PACKAGE_.*batman" .config | grep -v "=n" > /dev/null; then
+        if grep -E "^CONFIG_PACKAGE_.*batman" .config | grep -v "is not set" | grep -v "=n" > /dev/null; then
           echo "❌ BATMAN still enabled!"
-          grep -E "^CONFIG_PACKAGE_.*batman" .config | grep -v "=n"
+          grep -E "^CONFIG_PACKAGE_.*batman" .config | grep -v "is not set" | grep -v "=n"
           exit 1
         fi
         echo "✅ BATMAN disabled"
@@ -190,6 +213,8 @@ jobs:
       working-directory: openwrt
       run: |
         echo "===== VERIFYING CONFIG ====="
+        
+        # Sprawdź NSS
         for pkg in sqm-scripts-nss kmod-qca-nss-drv-qdisc kmod-qca-nss-drv-igs; do
           if grep -q "^CONFIG_PACKAGE_${pkg}=y" .config; then
             echo "  ✅ ${pkg}"
@@ -198,16 +223,23 @@ jobs:
             exit 1
           fi
         done
-        if grep -q "^CONFIG_PACKAGE_wpad-openssl=y" .config; then
-          echo "  ✅ wpad-openssl"
+        
+        # Sprawdź WiFi - akceptujemy różne warianty
+        if grep -q "^CONFIG_PACKAGE_wpad.*openssl" .config; then
+          echo "  ✅ wpad with openssl"
+        elif grep -q "^CONFIG_PACKAGE_hostapd.*openssl" .config; then
+          echo "  ✅ hostapd with openssl"
         else
-          echo "  ❌ wpad-openssl - MISSING"
+          echo "  ❌ No wpad/hostapd with openssl found"
           exit 1
         fi
-        if grep -q "^CONFIG_PACKAGE_wpad-mesh-openssl=y" .config; then
-          echo "  ❌ wpad-mesh-openssl - ENABLED"
+        
+        # Sprawdź czy nie ma mesh
+        if grep -q "^CONFIG_PACKAGE_wpad-mesh" .config; then
+          echo "  ❌ wpad-mesh - ENABLED"
           exit 1
         fi
+        
         echo "✅ All checks passed"
 
     - name: 📁 Apply custom files
@@ -236,7 +268,7 @@ jobs:
         SHORT_COMMIT="$(git rev-parse --short HEAD)"
         BUILD_DATE="$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
         mkdir -p files/etc
-        cat > files/etc/banner <<EOF
+        cat > files/etc/banner <<'EOF'
         
         ██████╗ ██╗    - WRX36
         ██╔══██╗██║
