@@ -25,21 +25,16 @@ permissions:
   actions: read
 
 env:
-  # === KONFIGURACJA ===
   OPENWRT_REPO: https://github.com/krystianokris/openwrt.git
   OPENWRT_BRANCH: dl-wrx36-nss
   TARGET: qualcommax/ipq807x
-  
-  # === BUDOWA ===
   CCACHE_MAX_SIZE: 10G
-  
-  # === WERSJE ===
   CACHE_VERSION: v3
 
 jobs:
   build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 180  # Ustawione na sztywno, nie jako zmienna
+    timeout-minutes: 180
     
     strategy:
       fail-fast: false
@@ -48,74 +43,34 @@ jobs:
     
     steps:
 
-    # ============================================================
-    # KROK 1: CHECKOUT
-    # ============================================================
-
     - name: 📦 Checkout
       uses: actions/checkout@v4
       with:
         fetch-depth: 1
-
-    # ============================================================
-    # KROK 2: ZWOLNIJ MIEJSCE (JEŚLI CLEAN BUILD)
-    # ============================================================
 
     - name: 💾 Free disk space
       if: github.event.inputs.clean_build == 'true'
       run: |
         echo "===== FREEING DISK SPACE ====="
         df -h
-        
         sudo rm -rf /usr/local/lib/android
         sudo rm -rf /usr/share/dotnet
         sudo rm -rf /opt/ghc
         sudo rm -rf /usr/local/share/boost
         sudo docker system prune -af 2>/dev/null || true
         sudo apt clean
-        
         echo "===== DISK AFTER ====="
         df -h
-
-    # ============================================================
-    # KROK 3: INSTALACJA ZALEŻNOŚCI
-    # ============================================================
 
     - name: 📦 Install dependencies
       run: |
         echo "===== INSTALLING DEPENDENCIES ====="
-        
         sudo apt update -qq
         sudo apt install -y -qq \
-          build-essential \
-          clang \
-          flex \
-          bison \
-          g++ \
-          gawk \
-          gcc-multilib \
-          gettext \
-          git \
-          libncurses-dev \
-          libssl-dev \
-          python3 \
-          python3-pip \
-          rsync \
-          unzip \
-          zlib1g-dev \
-          file \
-          ccache \
-          time \
-          tree \
-          jq \
-          bc \
-          wget
-        
+          build-essential clang flex bison g++ gawk gcc-multilib \
+          gettext git libncurses-dev libssl-dev python3 python3-pip \
+          rsync unzip zlib1g-dev file ccache time tree jq bc wget
         echo "✅ Dependencies installed"
-
-    # ============================================================
-    # KROK 4: KONFIGURACJA CCACHE
-    # ============================================================
 
     - name: ⚡ Setup ccache
       run: |
@@ -124,34 +79,16 @@ jobs:
         ccache -M ${{ env.CCACHE_MAX_SIZE }}
         echo "/usr/lib/ccache" >> $GITHUB_PATH
 
-    # ============================================================
-    # KROK 5: KLONOWANIE OPENWRT
-    # ============================================================
-
     - name: 🚀 Clone OpenWrt
       run: |
         echo "===== CLONING OPENWRT ====="
-        
         rm -rf openwrt
-        
-        git clone \
-          --single-branch \
-          --branch ${{ env.OPENWRT_BRANCH }} \
-          --depth 1 \
-          ${{ env.OPENWRT_REPO }} \
-          openwrt
-        
+        git clone --single-branch --branch ${{ env.OPENWRT_BRANCH }} --depth 1 ${{ env.OPENWRT_REPO }} openwrt
         cd openwrt
-        
         echo "OPENWRT_COMMIT=$(git rev-parse HEAD)" >> $GITHUB_ENV
         echo "OPENWRT_DATE=$(git log -1 --format=%ci)" >> $GITHUB_ENV
-        
         echo "✅ Cloned successfully"
         echo "Commit: $(git rev-parse --short HEAD)"
-
-    # ============================================================
-    # KROK 6: CACHE
-    # ============================================================
 
     - name: 💾 Cache ccache
       uses: actions/cache@v4
@@ -173,44 +110,30 @@ jobs:
           dlwrx36-${{ env.CACHE_VERSION }}-dl-
           dlwrx36-dl-
 
-    # ============================================================
-    # KROK 7: CZYSZCZENIE
-    # ============================================================
-
     - name: 🧹 Clean build (if requested)
       if: github.event.inputs.clean_build == 'true'
       working-directory: openwrt
       run: |
         echo "===== CLEAN BUILD ====="
-        rm -rf staging_dir
-        rm -rf tmp
-        rm -rf .config
-        rm -rf logs
+        rm -rf staging_dir tmp .config logs
         echo "✅ Cleaned"
 
     - name: 🧹 Standard cleanup
       working-directory: openwrt
       run: |
         echo "===== STANDARD CLEANUP ====="
-        rm -rf tmp
-        rm -rf .config
-        rm -rf .config.old
+        rm -rf tmp .config .config.old
         echo "✅ Cleaned (staging_dir preserved)"
-
-    # ============================================================
-    # KROK 8: PATCH APK (JEŚLI POTRZEBNY)
-    # ============================================================
 
     - name: 📝 Patch APK feed (if needed)
       working-directory: openwrt
       run: |
         echo "===== CHECKING APK ====="
         
-        # Sprawdź czy używamy APK
         if grep -q "CONFIG_USE_APK=y" ../configs/dl-wrx36.config 2>/dev/null; then
           echo "📦 APK detected - patching feeds"
           
-          python3 <<'PY'
+          cat > patch_apk.py << 'EOF'
           from pathlib import Path
           
           p = Path("include/feeds.mk")
@@ -246,14 +169,13 @@ jobs:
           
           p.write_text(content[:start] + new_block + content[end:])
           print("✅ APK feed patched")
-          PY
+          EOF
+          
+          python3 patch_apk.py
+          rm -f patch_apk.py
         else
           echo "📦 OPKG detected - no patch needed"
         fi
-
-    # ============================================================
-    # KROK 9: UPDATE FEEDS
-    # ============================================================
 
     - name: 📡 Update feeds
       working-directory: openwrt
@@ -263,10 +185,6 @@ jobs:
         ./scripts/feeds install -a
         echo "✅ Feeds updated"
 
-    # ============================================================
-    # KROK 10: KONFIGURACJA
-    # ============================================================
-
     - name: ⚙️ Configure OpenWrt
       working-directory: openwrt
       run: |
@@ -275,10 +193,6 @@ jobs:
         make defconfig
         echo "✅ Configured"
 
-    # ============================================================
-    # KROK 11: WYMUŚ WPAD-OPENSSL
-    # ============================================================
-
     - name: 🔧 Enforce wpad-openssl
       working-directory: openwrt
       run: |
@@ -286,17 +200,12 @@ jobs:
         sed -i '/^CONFIG_PACKAGE_wpad-/d' .config
         echo 'CONFIG_PACKAGE_wpad-openssl=y' >> .config
         make defconfig
-        
         if grep -q "^CONFIG_PACKAGE_wpad-openssl=y" .config; then
           echo "✅ wpad-openssl enabled"
         else
           echo "❌ Failed to enable wpad-openssl"
           exit 1
         fi
-
-    # ============================================================
-    # KROK 12: WYŁĄCZ BATMAN
-    # ============================================================
 
     - name: 🦇 Disable BATMAN
       working-directory: openwrt
@@ -305,15 +214,11 @@ jobs:
         sed -i '/^CONFIG_PACKAGE_.*batman/d' .config
         sed -i '/^CONFIG_PACKAGE_.*batctl/d' .config
         sed -i '/^CONFIG_PACKAGE_luci-proto-batman/d' .config
-        
         echo '# BATMAN disabled' >> .config
         echo 'CONFIG_PACKAGE_kmod-batman-adv=n' >> .config
         echo 'CONFIG_PACKAGE_batctl-full=n' >> .config
         echo 'CONFIG_PACKAGE_batctl-tiny=n' >> .config
-        
         make defconfig
-        
-        # Weryfikacja
         if grep -E "^CONFIG_PACKAGE_.*batman" .config | grep -v "=n" > /dev/null; then
           echo "❌ BATMAN still enabled!"
           grep -E "^CONFIG_PACKAGE_.*batman" .config | grep -v "=n"
@@ -321,16 +226,10 @@ jobs:
         fi
         echo "✅ BATMAN disabled"
 
-    # ============================================================
-    # KROK 13: WERYFIKACJA KONFIGURACJI
-    # ============================================================
-
     - name: ✅ Verify configuration
       working-directory: openwrt
       run: |
         echo "===== VERIFYING CONFIG ====="
-        
-        # Sprawdź NSS
         for pkg in sqm-scripts-nss kmod-qca-nss-drv-qdisc kmod-qca-nss-drv-igs; do
           if grep -q "^CONFIG_PACKAGE_${pkg}=y" .config; then
             echo "  ✅ ${pkg}"
@@ -339,45 +238,31 @@ jobs:
             exit 1
           fi
         done
-        
-        # Sprawdź wpad
         if grep -q "^CONFIG_PACKAGE_wpad-openssl=y" .config; then
           echo "  ✅ wpad-openssl"
         else
           echo "  ❌ wpad-openssl - MISSING"
           exit 1
         fi
-        
-        # Sprawdź czy nie ma mesh
         if grep -q "^CONFIG_PACKAGE_wpad-mesh-openssl=y" .config; then
           echo "  ❌ wpad-mesh-openssl - ENABLED"
           exit 1
         fi
-        
         echo "✅ All checks passed"
-
-    # ============================================================
-    # KROK 14: APLIKUJ PLIKI NIESTANDARDOWE
-    # ============================================================
 
     - name: 📁 Apply custom files
       run: |
         echo "===== APPLYING CUSTOM FILES ====="
-        
         mkdir -p openwrt/files
-        
         if [ -d "files" ] && [ "$(ls -A files 2>/dev/null)" ]; then
           rsync -a --delete files/ openwrt/files/
           echo "✅ Custom files copied"
         fi
-        
         echo "===== CLEANING BATMAN ====="
-        find openwrt/files -type f \( -iname '*batman*' -o -iname '*batctl*' \) -delete
+        find openwrt/files -type f \( -iname '*batman*' -o -iname '*batctl*' \) -delete 2>/dev/null || true
         rm -rf openwrt/files/usr/lib/lua/luci/controller/mesh 2>/dev/null || true
         rm -rf openwrt/files/usr/lib/lua/luci/view/mesh 2>/dev/null || true
         find openwrt/files -type d -empty -delete 2>/dev/null || true
-        
-        # Weryfikacja
         if find openwrt/files -type f -iname '*batman*' | grep -q .; then
           echo "❌ BATMAN files still exist!"
           find openwrt/files -type f -iname '*batman*'
@@ -385,18 +270,12 @@ jobs:
         fi
         echo "✅ Cleanup complete"
 
-    # ============================================================
-    # KROK 15: GENERUJ BANNER
-    # ============================================================
-
     - name: 🎨 Generate banner
       working-directory: openwrt
       run: |
         SHORT_COMMIT="$(git rev-parse --short HEAD)"
         BUILD_DATE="$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
-        
         mkdir -p files/etc
-        
         cat > files/etc/banner <<EOF
         
         ██████╗ ██╗    - WRX36
@@ -426,12 +305,7 @@ jobs:
         ================================
         
         EOF
-        
         echo "✅ Banner generated"
-
-    # ============================================================
-    # KROK 16: POBERZ ŹRÓDŁA
-    # ============================================================
 
     - name: 📥 Download sources
       working-directory: openwrt
@@ -440,71 +314,54 @@ jobs:
         make download -j$(nproc) V=s
         echo "✅ Sources downloaded"
 
-    # ============================================================
-    # KROK 17: BUDOWA
-    # ============================================================
-
     - name: 🔨 Build firmware
       working-directory: openwrt
       env:
         CONFIG_CCACHE: 1
       run: |
         echo "===== BUILDING FIRMWARE ====="
-        
         export CCACHE_DIR="$HOME/.ccache"
-        
         echo "Building variant: ${{ matrix.variant }}"
         echo "Using $(nproc) jobs"
-        
         make tools/install -j$(nproc) V=s
         make toolchain/install -j$(nproc) V=s
         make -j$(nproc) V=s
-        
         echo "✅ Build complete"
-
-    # ============================================================
-    # KROK 18: ZBIERZ ARTIFAKTY
-    # ============================================================
 
     - name: 📦 Collect artifacts
       if: always()
       run: |
         echo "===== COLLECTING ARTIFACTS ====="
-        
         mkdir -p artifacts-${{ matrix.variant }}
-        
-        find openwrt/bin/targets/${{ env.TARGET }} \
-          -maxdepth 2 \
-          -type f \
-          \( -name '*sysupgrade*' -o -name '*factory*' -o -name '*.manifest' -o -name '*.itb' -o -name '*.bin' \) \
-          -exec cp -v {} artifacts-${{ matrix.variant }}/ \;
-        
-        echo "✅ Artifacts collected"
-
-    # ============================================================
-    # KROK 19: GENERUJ SUMY KONTROLNE
-    # ============================================================
+        if [ -d "openwrt/bin/targets/${{ env.TARGET }}" ]; then
+          find openwrt/bin/targets/${{ env.TARGET }} \
+            -maxdepth 2 -type f \
+            \( -name '*sysupgrade*' -o -name '*factory*' -o -name '*.manifest' -o -name '*.itb' -o -name '*.bin' \) \
+            -exec cp -v {} artifacts-${{ matrix.variant }}/ \; 2>/dev/null || true
+          echo "✅ Artifacts collected"
+        else
+          echo "⚠️ No build output found"
+        fi
 
     - name: 🔐 Generate checksums
+      if: always()
       run: |
         echo "===== GENERATING CHECKSUMS ====="
-        
-        cd artifacts-${{ matrix.variant }}
-        find . -type f -exec sha256sum {} \; > sha256sums.txt
-        find . -type f -exec md5sum {} \; > md5sums.txt
-        cat sha256sums.txt
-        echo "✅ Checksums generated"
-
-    # ============================================================
-    # KROK 20: WERYFIKUJ MANIFEST (BEZPIECZEŃSTWO)
-    # ============================================================
+        if [ -d "artifacts-${{ matrix.variant }}" ] && [ "$(ls -A artifacts-${{ matrix.variant }})" ]; then
+          cd artifacts-${{ matrix.variant }}
+          find . -type f -exec sha256sum {} \; > sha256sums.txt
+          find . -type f -exec md5sum {} \; > md5sums.txt
+          cat sha256sums.txt
+          echo "✅ Checksums generated"
+        else
+          echo "⚠️ No artifacts to checksum"
+        fi
 
     - name: 🔒 Verify manifest
+      if: always()
       run: |
         echo "===== VERIFYING MANIFEST ====="
-        
-        MANIFEST=$(find artifacts-${{ matrix.variant }} -name "*.manifest" | head -n1)
-        
+        MANIFEST=$(find artifacts-${{ matrix.variant }} -name "*.manifest" 2>/dev/null | head -n1)
         if [ -f "$MANIFEST" ]; then
           if grep -E -i 'batman|batctl|wpad-mesh' "$MANIFEST"; then
             echo "❌ CRITICAL: BATMAN/MESH packages found!"
@@ -515,10 +372,6 @@ jobs:
           echo "⚠️ No manifest found"
         fi
 
-    # ============================================================
-    # KROK 21: UPLOAD ARTIFAKTÓW
-    # ============================================================
-
     - name: 📤 Upload artifacts
       if: always()
       uses: actions/upload-artifact@v4
@@ -526,10 +379,6 @@ jobs:
         name: DL-WRX36-${{ matrix.variant }}-${{ github.run_number }}
         path: artifacts-${{ matrix.variant }}/
         retention-days: 30
-
-    # ============================================================
-    # KROK 22: RELEASE (TYLKO STANDARD)
-    # ============================================================
 
     - name: 🚀 Create release
       if: success() && matrix.variant == 'standard'
@@ -539,7 +388,6 @@ jobs:
         name: DL-WRX36 NSS Build ${{ github.run_number }}
         prerelease: true
         draft: false
-        
         body: |
           # 🚀 DL-WRX36 NSS Build ${{ github.run_number }}
           
@@ -572,15 +420,9 @@ jobs:
           
           ---
           *Built with ❤️ by GitHub Actions*
-        
         files: artifacts-standard/*
-        
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    # ============================================================
-    # KROK 23: POKAŻ BŁĘDY (JEŚLI BUILD PADNIE)
-    # ============================================================
 
     - name: 📋 Show errors on failure
       if: failure()
@@ -588,12 +430,4 @@ jobs:
         echo "===== BUILD FAILED ====="
         echo "Build ${{ github.run_number }} failed"
         echo "Check logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-        
-        # Pokaż rejected patche
         find openwrt -name "*.rej" -exec echo "Rejected patch: {}" \; -exec cat {} \; 2>/dev/null || true
-        
-        # Pokaż ostatnie błędy
-        if [ -f "openwrt/logs/package/feeds/*/failed" ]; then
-          echo "=== FAILED PACKAGES ==="
-          cat openwrt/logs/package/feeds/*/failed 2>/dev/null || true
-        fi
