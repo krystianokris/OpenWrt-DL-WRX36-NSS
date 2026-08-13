@@ -268,7 +268,7 @@ jobs:
         SHORT_COMMIT="$(git rev-parse --short HEAD)"
         BUILD_DATE="$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
         mkdir -p files/etc
-        cat > files/etc/banner <<'EOF'
+        cat > files/etc/banner <<EOF
         
         ██████╗ ██╗    - WRX36
         ██╔══██╗██║
@@ -276,26 +276,26 @@ jobs:
         ██║  ██║██║
         ██████╔╝███████╗
         ╚═════╝ ╚══════╝
-        
+
         Dynalink DL-WRX36
         ================================
-        
+
         NSS / ECM        : ENABLED
         NSS Qdisc        : ENABLED
         SQM NSS          : ENABLED
         NSS IGS          : ENABLED
-        
+
         WiFi             : WPA/OPENSSL
         Mesh             : DISABLED
         BATMAN           : DISABLED
-        
+
         Build            : ${{ github.run_number }}
         Date             : ${BUILD_DATE}
         Commit           : ${SHORT_COMMIT}
         Variant          : ${{ matrix.variant }}
-        
+
         ================================
-        
+
         EOF
         echo "✅ Banner generated"
 
