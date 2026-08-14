@@ -221,18 +221,10 @@ Before calling a build “good enough”:
 ---
 
 ## Project structure
-configs/dl-wrx36.config     # build config
-files/                      # rootfs overlay
-etc/init.d/               # nss-tuning, wifi-nss-tuning
-etc/sysctl.d/99-nss.conf
-usr/libexec/rpcd/         # luci.nss-dashboard backend
-www/luci-static/.../nssdashboard/status.js
-scripts/patch_apk.py
-.github/workflows/          # build pipeline
-
 Credits
 Based on OpenWrt and Qualcomm NSS community work, especially the AgustinLorenzo NSS tree and earlier work associated with qosmio.
 The DL-WRX36 is officially supported by OpenWrt. NSS hardware acceleration comes from community/custom builds.
 
 Disclaimer
-Personal / community use. Custom NSS patches and Qualcomm-specific components can introduce regressions not present in official OpenWrt releases.Always keep a recovery image and a known-good build before upgrading.
+Personal / community use. Custom NSS patches and Qualcomm-specific components can introduce regressions not present in official OpenWrt releases.
+Always keep a recovery image and a known-good build before upgrading.
