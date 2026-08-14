@@ -1,7 +1,6 @@
 #!/bin/sh
 
 value() {
-	# Escape for JSON string: backslash, quote, newline, CR, tab
 	printf '%s' "$1" | sed \
 		-e 's/\\/\\\\/g' \
 		-e 's/"/\\"/g' \
@@ -13,6 +12,115 @@ value() {
 
 num_file() {
 	[ -r "$1" ] && cat "$1" 2>/dev/null || printf '0'
+}
+
+# Per-core CPU % from /proc/stat (needs previous sample in /tmp)
+cpu_cores() {
+	local state="/tmp/nss-dash-cpu"
+	local now prev
+	now="$(awk '/^cpu[0-9]/ {
+		idle=$5+$6; total=0; for(i=2;i<=NF;i++) total+=$i;
+		printf "%s %s ", idle, total
+	}' /proc/stat)"
+
+	cpu0="n/a"; cpu1="n/a"; cpu2="n/a"; cpu3="n/a"
+
+	if [ -r "$state" ]; then
+		prev="$(cat "$state")"
+		set -- $now
+		set -- $1 $2 $3 $4 $5 $6 $7 $8  # idle0 total0 idle1 total1 ...
+		i0=$1; t0=$2; i1=$3; t1=$4; i2=$5; t2=$6; i3=$7; t3=$8
+		set -- $prev
+		pi0=$1; pt0=$2; pi1=$3; pt1=$4; pi2=$5; pt2=$6; pi3=$7; pt3=$8
+
+		calc() {
+			# $1=idle_now $2=total_now $3=idle_prev $4=total_prev
+			local di dt used
+			di=$(( $1 - $3 ))
+			dt=$(( $2 - $4 ))
+			[ "$dt" -gt 0 ] 2>/dev/null || { printf 'n/a'; return; }
+			used=$(( 100 * (dt - di) / dt ))
+			[ "$used" -lt 0 ] && used=0
+			[ "$used" -gt 100 ] && used=100
+			printf '%s%%' "$used"
+		}
+
+		cpu0="$(calc "$i0" "$t0" "$pi0" "$pt0")"
+		cpu1="$(calc "$i1" "$t1" "$pi1" "$pt1")"
+		cpu2="$(calc "$i2" "$t2" "$pi2" "$pt2")"
+		cpu3="$(calc "$i3" "$t3" "$pi3" "$pt3")"
+	fi
+
+	printf '%s' "$now" > "$state"
+}
+
+# Resolve WAN L3 device + link device dynamically
+resolve_wan() {
+	wan_dev=""
+	wan_l3=""
+	wan_vlan="Unavailable"
+
+	# Prefer ifstatus (OpenWrt)
+	if command -v ifstatus >/dev/null 2>&1; then
+		wan_l3="$(ifstatus wan 2>/dev/null | jsonfilter -e '@.l3_device' 2>/dev/null)"
+		wan_dev="$(ifstatus wan 2>/dev/null | jsonfilter -e '@.device' 2>/dev/null)"
+	fi
+
+	# Fallback: uci
+	[ -n "$wan_dev" ] || wan_dev="$(uci -q get network.wan.device 2>/dev/null)"
+	[ -n "$wan_l3" ] || wan_l3="$(uci -q get network.wan.ifname 2>/dev/null)"
+
+	# Common PPPoE default
+	[ -n "$wan_l3" ] || {
+		ip link show pppoe-wan >/dev/null 2>&1 && wan_l3="pppoe-wan"
+	}
+	[ -n "$wan_dev" ] || {
+		ip link show wan >/dev/null 2>&1 && wan_dev="wan"
+	}
+
+	# VLAN hint from device name
+	case "$wan_dev" in
+		*.*) wan_vlan="$wan_dev" ;;
+		*)
+			for c in wan.911 wan.835 eth0.911; do
+				ip link show "$c" >/dev/null 2>&1 && { wan_vlan="$c"; break; }
+			done
+			;;
+	esac
+
+	[ -n "$wan_l3" ] || wan_l3="pppoe-wan"
+	[ -n "$wan_dev" ] || wan_dev="wan"
+}
+
+# Live RX/TX rate (bytes/s) using /tmp previous sample
+wan_rates() {
+	local state="/tmp/nss-dash-wan"
+	local iface="$1"
+	local rx tx now prev prx ptx pnow dt
+
+	rx="$(ip -s link show "$iface" 2>/dev/null | awk '/RX:/{getline; print $1; exit}')"
+	tx="$(ip -s link show "$iface" 2>/dev/null | awk '/TX:/{getline; print $1; exit}')"
+	[ -n "$rx" ] || rx=0
+	[ -n "$tx" ] || tx=0
+	now="$(date +%s)"
+
+	wan_rx="$rx"
+	wan_tx="$tx"
+	wan_rx_rate="0"
+	wan_tx_rate="0"
+
+	if [ -r "$state" ]; then
+		read -r prx ptx pnow < "$state"
+		dt=$(( now - pnow ))
+		if [ "$dt" -gt 0 ] 2>/dev/null; then
+			wan_rx_rate=$(( (rx - prx) / dt ))
+			wan_tx_rate=$(( (tx - ptx) / dt ))
+			[ "$wan_rx_rate" -lt 0 ] && wan_rx_rate=0
+			[ "$wan_tx_rate" -lt 0 ] && wan_tx_rate=0
+		fi
+	fi
+
+	printf '%s %s %s\n' "$rx" "$tx" "$now" > "$state"
 }
 
 case "$1" in
@@ -34,7 +142,6 @@ call)
 		END {
 			printf "%d %d", (total-available)/1024, total/1024
 		}' /proc/meminfo)
-
 		memory="${1:-0} MiB / ${2:-0} MiB"
 
 		uptime="$(uptime 2>/dev/null | sed 's/.* up[[:space:]]*//; s/,.*//')"
@@ -96,6 +203,9 @@ call)
 			cpu_freq="Unknown"
 		fi
 
+		# A: per-core CPU
+		cpu_cores
+
 		wifi="$(iwinfo 2>/dev/null | awk '/Channel:/ {
 			sub(/^.*Channel: /,"");
 			sub(/ \|.*$/,"");
@@ -106,25 +216,29 @@ call)
 
 		irqs="$(awk '/ath11k|wlan|wifi/ { count++ } END { print count+0 }' /proc/interrupts 2>/dev/null)"
 
-		# WAN / PPPoE (still fixed names – dynamic detection later)
-		wan_link="$(ip link show wan 2>/dev/null | grep -q 'state UP' && printf 'UP' || printf 'DOWN')"
-		pppoe_link="$(ip -4 addr show dev pppoe-wan 2>/dev/null | grep -q 'inet ' && printf 'Connected' || printf 'Disconnected')"
+		# B: dynamic WAN
+		resolve_wan
 
-		wan_ipv4="$(ip -4 addr show dev pppoe-wan 2>/dev/null | awk '/inet / {print $2; exit}')"
+		wan_link="$(ip link show "$wan_dev" 2>/dev/null | grep -q 'state UP' && printf 'UP' || printf 'DOWN')"
+
+		if ip -4 addr show dev "$wan_l3" 2>/dev/null | grep -q 'inet '; then
+			pppoe_link="Connected"
+		elif echo "$wan_l3" | grep -q pppoe; then
+			pppoe_link="Disconnected"
+		else
+			# non-PPPoE WAN still "up" if has IPv4
+			ip -4 addr show dev "$wan_l3" 2>/dev/null | grep -q 'inet ' && pppoe_link="Connected" || pppoe_link="Disconnected"
+		fi
+
+		wan_ipv4="$(ip -4 addr show dev "$wan_l3" 2>/dev/null | awk '/inet / {print $2; exit}')"
 		[ -n "$wan_ipv4" ] || wan_ipv4="Unavailable"
 
-		wan_ipv6="$(ip -6 addr show dev pppoe-wan scope global 2>/dev/null | awk '/inet6 / {print $2; exit}')"
+		wan_ipv6="$(ip -6 addr show dev "$wan_l3" scope global 2>/dev/null | awk '/inet6 / {print $2; exit}')"
 		[ -n "$wan_ipv6" ] || wan_ipv6="Unavailable"
 
-		wan_rx="$(ip -s link show pppoe-wan 2>/dev/null | awk '/RX:/{getline; print $1}')"
-		[ -n "$wan_rx" ] || wan_rx="0"
+		# C: live rates + totals on L3 device
+		wan_rates "$wan_l3"
 
-		wan_tx="$(ip -s link show pppoe-wan 2>/dev/null | awk '/TX:/{getline; print $1}')"
-		[ -n "$wan_tx" ] || wan_tx="0"
-
-		vlan="$(ip link show wan.911 2>/dev/null | grep -q 'wan.911' && printf 'wan.911' || printf 'Unavailable')"
-
-		# Health
 		nss_drv="$(/sbin/lsmod 2>/dev/null | grep -q '^qca_nss_drv ' && printf 'OK' || printf 'ERROR')"
 		nss_dp="$(/sbin/lsmod 2>/dev/null | grep -q '^qca_nss_dp ' && printf 'OK' || printf 'ERROR')"
 		ecm_state="$( [ -r /sys/kernel/debug/ecm/ecm_nss_ipv4/accelerated_count ] && printf 'OK' || printf 'ERROR' )"
@@ -139,7 +253,7 @@ call)
 			health="WARNING"
 		fi
 
-		printf '{"cpu_load":"%s","memory":"%s","uptime":"%s","build":"%s","ath11k_nss":"%s","nss_modules":"%s","ecm_ipv4":"%s","ecm_tcp":"%s","ecm_udp":"%s","ecm_pending":"%s","ecm_ipv6":"%s","ecm_tcp6":"%s","ecm_udp6":"%s","ecm_pending6":"%s","ecm_pending_decel":"%s","ecm_pending_decel6":"%s","ecm_exceptions4":"%s","ecm_exceptions6":"%s","ecm_connections":"%s","ecm_hosts":"%s","ecm_ifaces":"%s","ecm_mappings":"%s","ecm_nodes":"%s","lan1":"%s","lan2":"%s","lan3":"%s","lan4":"%s","br_lan":"%s","phy0":"%s","phy1":"%s","wifi_channel":"%s","wifi_irqs":"%s","temperature":"%s","qdisc":"%s","cpu_freq":"%s","wan_link":"%s","pppoe_status":"%s","wan_ipv4":"%s","wan_ipv6":"%s","wan_rx":"%s","wan_tx":"%s","wan_vlan":"%s","health":"%s","nss_drv":"%s","nss_dp":"%s","ecm_health":"%s"}\n' \
+		printf '{"cpu_load":"%s","memory":"%s","uptime":"%s","build":"%s","ath11k_nss":"%s","nss_modules":"%s","ecm_ipv4":"%s","ecm_tcp":"%s","ecm_udp":"%s","ecm_pending":"%s","ecm_ipv6":"%s","ecm_tcp6":"%s","ecm_udp6":"%s","ecm_pending6":"%s","ecm_pending_decel":"%s","ecm_pending_decel6":"%s","ecm_exceptions4":"%s","ecm_exceptions6":"%s","ecm_connections":"%s","ecm_hosts":"%s","ecm_ifaces":"%s","ecm_mappings":"%s","ecm_nodes":"%s","lan1":"%s","lan2":"%s","lan3":"%s","lan4":"%s","br_lan":"%s","phy0":"%s","phy1":"%s","wifi_channel":"%s","wifi_irqs":"%s","temperature":"%s","qdisc":"%s","cpu_freq":"%s","cpu0":"%s","cpu1":"%s","cpu2":"%s","cpu3":"%s","wan_link":"%s","pppoe_status":"%s","wan_ipv4":"%s","wan_ipv6":"%s","wan_rx":"%s","wan_tx":"%s","wan_rx_rate":"%s","wan_tx_rate":"%s","wan_vlan":"%s","wan_if":"%s","wan_l3":"%s","health":"%s","nss_drv":"%s","nss_dp":"%s","ecm_health":"%s"}\n' \
 		"$(value "$load")" \
 		"$(value "$memory")" \
 		"$(value "$uptime")" \
@@ -175,13 +289,21 @@ call)
 		"$(value "$temp")" \
 		"$qdisc" \
 		"$(value "$cpu_freq")" \
+		"$(value "$cpu0")" \
+		"$(value "$cpu1")" \
+		"$(value "$cpu2")" \
+		"$(value "$cpu3")" \
 		"$wan_link" \
 		"$pppoe_link" \
 		"$(value "$wan_ipv4")" \
 		"$(value "$wan_ipv6")" \
 		"$wan_rx" \
 		"$wan_tx" \
-		"$vlan" \
+		"$wan_rx_rate" \
+		"$wan_tx_rate" \
+		"$(value "$wan_vlan")" \
+		"$(value "$wan_dev")" \
+		"$(value "$wan_l3")" \
 		"$health" \
 		"$nss_drv" \
 		"$nss_dp" \
