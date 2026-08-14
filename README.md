@@ -115,7 +115,7 @@ NSS does **not** accelerate everything universally. Traffic automatically falls 
 
 ## ⚙️ Performance Philosophy
 
-1. **Avoid blind optimizations:** Extra background daemons and aggressive tweaks can drain RAM and introduce IRQ overhead without delivering real gains.
+1. **Avoid blind optimizations:** Extra background daemons and aggressive tweaks can cost RAM/IRQs without delivering real gains.
 2. **Measure before changing:** Benchmark LAN↔WAN, 2.5 GbE, PPPoE, concurrent streams, Wi-Fi→WAN, WireGuard, latency under load, and CPU/ECM behavior.
 3. **Protect the NSS path:** Keep the fast path clean for maximum throughput; test SQM separately (best bufferbloat score ≠ highest Mbps).
 4. **No aggressive IRQ pinning by default:** `wifi-nss-tuning` strictly applies `nss_offload=1`.
