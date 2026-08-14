@@ -111,6 +111,12 @@ call)
                 wan_ipv6="$(ip -6 addr show dev pppoe-wan scope global 2>/dev/null | awk '/inet6 / {print $2; exit}')"
                 [ -n "$wan_ipv6" ] || wan_ipv6="Unavailable"
 
+                wan_rx="$(ip -s link show pppoe-wan 2>/dev/null | awk '/RX:/{getline; print $1}')"
+                [ -n "$wan_rx" ] || wan_rx="0"
+
+                wan_tx="$(ip -s link show pppoe-wan 2>/dev/null | awk '/TX:/{getline; print $1}')"
+                [ -n "$wan_tx" ] || wan_tx="0"
+
                 vlan="$(ip link show wan.911 2>/dev/null | grep -q 'wan.911' && printf 'wan.911' || printf 'Unavailable')"
 
                 # Health
@@ -130,38 +136,7 @@ call)
                         health="WARNING"
                 fi
 
-
-
-                usteer_status="Inactive"
-
-                if command -v pidof >/dev/null 2>&1 &&
-                   pidof usteerd >/dev/null 2>&1; then
-                        usteer_status="Active"
-                elif [ -x /etc/init.d/usteer ] &&
-                     /etc/init.d/usteer status >/dev/null 2>&1; then
-                        usteer_status="Active"
-                fi
-
-
-
-                        else
-                        fi
-
-                                        awk '/=>/ {print $1 " " $2; exit}')"
-
-                                        awk 'NR > 1 && NF {count++} END {print count+0}')"
-
-                                        awk 'NR > 1 && NF {count++} END {print count+0}')"
-
-
-                                        grep -q 'enabled' && printf 'Enabled' || printf 'Disabled')"
-
-                                        grep -q 'enabled' && printf 'Enabled' || printf 'Disabled')"
-
-                                        grep -qv '^disabled' && printf 'Enabled' || printf 'Disabled')"
-                        fi
-                fi
-
+                printf '{"cpu_load":"%s","memory":"%s","uptime":"%s","build":"%s","ath11k_nss":"%s","nss_modules":"%s","ecm_ipv4":"%s","ecm_tcp":"%s","ecm_udp":"%s","ecm_pending":"%s","ecm_ipv6":"%s","ecm_tcp6":"%s","ecm_udp6":"%s","ecm_pending6":"%s","ecm_pending_decel":"%s","ecm_pending_decel6":"%s","ecm_exceptions4":"%s","ecm_exceptions6":"%s","ecm_connections":"%s","ecm_hosts":"%s","ecm_ifaces":"%s","ecm_mappings":"%s","ecm_nodes":"%s","lan1":"%s","lan2":"%s","lan3":"%s","lan4":"%s","br_lan":"%s","phy0":"%s","phy1":"%s","wifi_channel":"%s","wifi_irqs":"%s","temperature":"%s","qdisc":"%s","cpu_freq":"%s","wan_link":"%s","pppoe_status":"%s","wan_ipv4":"%s","wan_ipv6":"%s","wan_rx":"%s","wan_tx":"%s","wan_vlan":"%s","health":"%s","nss_drv":"%s","nss_dp":"%s","ecm_health":"%s"}\n' \
                 "$(value "$load")" \
                 "$(value "$memory")" \
                 "$(value "$uptime")" \
@@ -207,11 +182,9 @@ call)
                 "$health" \
                 "$nss_drv" \
                 "$nss_dp" \
-                "$ecm_state" \
-                "$(value "$usteer_status")"
+                "$ecm_state"
 
         ;;
         esac
         ;;
-
 esac
