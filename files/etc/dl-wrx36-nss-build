@@ -1,10 +1,10 @@
 DL-WRX36 NSS Performance Edition
 
 Build:
-2026-08-06
+2026-08-14
 
 Release:
-19
+post-dashboard-cleanup
 
 Firmware:
 AgustinLorenzo OpenWrt NSS
@@ -20,6 +20,5 @@ Features:
 - ECM acceleration
 - ath11k NSS offload
 - NSS qdisc
-- LuCI NSS dashboard
-- DL-WRX36 status page
-- Native LuCI JS dashboard
+- LuCI NSS dashboard (per-core CPU, dynamic WAN, live rates)
+- No mesh / BATMAN

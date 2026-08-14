@@ -1,25 +1,22 @@
 #!/bin/sh
 
-chmod +x /usr/libexec/rpcd/luci.nss-status
-chmod +x /usr/libexec/rpcd/luci.ecm-status
-chmod +x /usr/libexec/rpcd/luci.nss-dashboard
+chmod +x /usr/libexec/rpcd/luci.nss-status 2>/dev/null
+chmod +x /usr/libexec/rpcd/luci.ecm-status 2>/dev/null
+chmod +x /usr/libexec/rpcd/luci.nss-dashboard 2>/dev/null
 
-chmod +x /etc/init.d/nss-tuning
-/etc/init.d/nss-tuning enable
+chmod +x /etc/init.d/nss-tuning 2>/dev/null
+[ -x /etc/init.d/nss-tuning ] && /etc/init.d/nss-tuning enable
 
-chmod +x /usr/lib/sqm/nss-helper.sh
+chmod +x /usr/lib/sqm/nss-helper.sh 2>/dev/null
 
-chmod +x /etc/init.d/sqm-nss
-/etc/init.d/sqm-nss enable
+chmod +x /etc/init.d/wifi-nss-tuning 2>/dev/null
+[ -x /etc/init.d/wifi-nss-tuning ] && /etc/init.d/wifi-nss-tuning enable
 
-chmod +x /etc/init.d/wifi-nss-tuning
-/etc/init.d/wifi-nss-tuning enable
+rm -rf /tmp/luci-indexcache /tmp/luci-modulecache /tmp/rpcd 2>/dev/null
 
-rm -rf /tmp/luci-indexcache /tmp/luci-modulecache /tmp/rpcd
+uci -q set luci.main.mediaurlbase='/luci-static/openwrt2020'
+uci -q commit luci
 
-uci set luci.main.mediaurlbase='/luci-static/openwrt2020'
-uci commit luci
-
-rm -rf /tmp/luci-indexcache /tmp/luci-modulecache /tmp/rpcd
+rm -rf /tmp/luci-indexcache /tmp/luci-modulecache /tmp/rpcd 2>/dev/null
 
 exit 0
