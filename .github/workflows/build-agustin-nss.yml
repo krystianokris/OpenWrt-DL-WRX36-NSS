@@ -372,46 +372,56 @@ jobs:
         path: artifacts-${{ matrix.variant }}/
         retention-days: 30
 
+    - name: 📅 Set release meta
+      if: success() && matrix.variant == 'standard'
+      id: meta
+      run: |
+        echo "date=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+
     - name: 🚀 Create release
       if: success() && matrix.variant == 'standard'
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: dl-wrx36-${{ github.run_number }}
-        name: DL-WRX36 NSS Build ${{ github.run_number }}
+        tag_name: dl-wrx36-${{ steps.meta.outputs.date }}-${{ github.run_number }}
+        name: DL-WRX36 NSS ${{ steps.meta.outputs.date }} (build ${{ github.run_number }})
         prerelease: true
         draft: false
         body: |
-          # 🚀 DL-WRX36 NSS Build ${{ github.run_number }}
-          
-          ## ✨ Features
-          - ✅ Qualcomm NSS acceleration
-          - ✅ ECM acceleration
-          - ✅ ath11k NSS offload
-          - ✅ NSS qdisc
-          - ✅ SQM NSS scripts
-          - ✅ NSS IGS
-          - ✅ Custom LuCI dashboard
-          - ✅ Standard WPA/OpenSSL WiFi
-          
-          ## 🚫 Disabled
-          - ❌ Mesh WiFi
-          - ❌ BATMAN
-          
-          ## 📦 Build Details
+          # DL-WRX36 NSS ${{ steps.meta.outputs.date }}
+
+          **Build run:** ${{ github.run_number }}
+
+          ## Features
+          - Qualcomm NSS acceleration
+          - ECM acceleration
+          - ath11k NSS offload
+          - NSS qdisc
+          - SQM NSS scripts
+          - NSS IGS
+          - Custom LuCI dashboard
+          - LuCI OpenWrt 2020 theme
+          - Standard WPA/OpenSSL WiFi
+
+          ## Disabled
+          - Mesh WiFi
+          - BATMAN
+
+          ## Build details
           - **Source:** ${{ env.OPENWRT_REPO }}
           - **Branch:** ${{ env.OPENWRT_BRANCH }}
           - **Commit:** `${{ env.OPENWRT_COMMIT }}`
-          - **Date:** ${{ env.OPENWRT_DATE }}
+          - **OpenWrt commit date:** ${{ env.OPENWRT_DATE }}
+          - **Release date:** ${{ steps.meta.outputs.date }}
           - **Variant:** ${{ matrix.variant }}
-          
-          ## 📋 Files
+
+          ## Files
           - `sysupgrade.bin` - Firmware upgrade
           - `factory.bin` - Initial flash
           - `*.manifest` - Package list
           - `sha256sums.txt` - SHA256 checksums
-          
+
           ---
-          *Built with ❤️ by GitHub Actions*
+          Built by GitHub Actions
         files: artifacts-standard/*
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
