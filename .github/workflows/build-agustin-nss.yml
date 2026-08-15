@@ -366,7 +366,7 @@ jobs:
       with:
         tag_name: dl-wrx36-${{ steps.meta.outputs.date }}-${{ github.run_number }}
         name: DL-WRX36 NSS ${{ steps.meta.outputs.date }} (build ${{ github.run_number }})
-        prerelease: true
+        prerelease: false
         draft: false
         body: |
           # DL-WRX36 NSS ${{ steps.meta.outputs.date }}
