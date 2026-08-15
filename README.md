@@ -39,6 +39,7 @@ Custom OpenWrt NSS firmware for the **Dynalink DL-WRX36** (Qualcomm IPQ807x).
 
 ## ✨ Main Features
 
+- LuCI theme: luci-theme-openwrt-2020
 * **Qualcomm NSS acceleration** (DP + ECM)
 * **`ath11k` NSS Wi-Fi offload**
 * **NSS Qdisc + SQM NSS scripts**
