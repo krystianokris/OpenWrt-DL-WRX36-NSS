@@ -30,17 +30,18 @@ env:
   TARGET: qualcommax/ipq807x
   CCACHE_MAX_SIZE: 10G
   CACHE_VERSION: v3
+  KEEP_RELEASES: "3"
 
 jobs:
   build:
     runs-on: ubuntu-24.04
     timeout-minutes: 180
-    
+
     strategy:
       fail-fast: false
       matrix:
         variant: ${{ fromJSON(github.event.inputs.variant == 'both' && '["standard", "minimal"]' || github.event.inputs.variant == 'minimal' && '["minimal"]' || '["standard"]') }}
-    
+
     steps:
 
     - name: 📦 Checkout
@@ -129,7 +130,6 @@ jobs:
       working-directory: openwrt
       run: |
         echo "===== CHECKING APK ====="
-        
         if grep -q "CONFIG_USE_APK=y" ../configs/dl-wrx36.config 2>/dev/null; then
           echo "📦 APK detected - patching feeds"
           if [ -f ../scripts/patch_apk.py ]; then
@@ -161,31 +161,20 @@ jobs:
       working-directory: openwrt
       run: |
         echo "===== FIXING WIFI CONFIG ====="
-        
-        # Sprawdź jakie opcje wpad są dostępne
         echo "Available wpad options:"
         grep -E '^CONFIG_PACKAGE_wpad' .config || echo "No wpad config found"
-        
-        # Usuń wszystkie wpad
         sed -i '/^CONFIG_PACKAGE_wpad/d' .config
-        
-        # Dodaj tylko to co jest potrzebne - sprawdź czy wpad-openssl istnieje
         if grep -q "CONFIG_PACKAGE_wpad-openssl" ../configs/dl-wrx36.config; then
           echo 'CONFIG_PACKAGE_wpad-openssl=y' >> .config
         elif grep -q "CONFIG_PACKAGE_wpad-basic-openssl" ../configs/dl-wrx36.config; then
           echo 'CONFIG_PACKAGE_wpad-basic-openssl=y' >> .config
         else
-          # Jeśli żaden nie istnieje, spróbujmy hostapd i wpad minimal
           echo 'CONFIG_PACKAGE_wpad-basic-openssl=y' >> .config
           echo 'CONFIG_PACKAGE_hostapd-openssl=y' >> .config
         fi
-        
-        # Wyłącz mesh
         echo '# CONFIG_PACKAGE_wpad-mesh-openssl is not set' >> .config
         echo '# CONFIG_PACKAGE_wpad-mesh-wolfssl is not set' >> .config
-        
         make defconfig
-        
         echo "===== FINAL WPAD CONFIG ====="
         grep -E '^CONFIG_PACKAGE_wpad' .config || echo "No wpad config"
         grep -E '^CONFIG_PACKAGE_hostapd' .config || echo "No hostapd config"
@@ -213,8 +202,6 @@ jobs:
       working-directory: openwrt
       run: |
         echo "===== VERIFYING CONFIG ====="
-        
-        # Sprawdź NSS
         for pkg in sqm-scripts-nss kmod-qca-nss-drv-qdisc kmod-qca-nss-drv-igs; do
           if grep -q "^CONFIG_PACKAGE_${pkg}=y" .config; then
             echo "  ✅ ${pkg}"
@@ -223,8 +210,6 @@ jobs:
             exit 1
           fi
         done
-        
-        # Sprawdź WiFi - akceptujemy różne warianty
         if grep -q "^CONFIG_PACKAGE_wpad.*openssl" .config; then
           echo "  ✅ wpad with openssl"
         elif grep -q "^CONFIG_PACKAGE_hostapd.*openssl" .config; then
@@ -233,13 +218,10 @@ jobs:
           echo "  ❌ No wpad/hostapd with openssl found"
           exit 1
         fi
-        
-        # Sprawdź czy nie ma mesh
         if grep -q "^CONFIG_PACKAGE_wpad-mesh" .config; then
           echo "  ❌ wpad-mesh - ENABLED"
           exit 1
         fi
-        
         echo "✅ All checks passed"
 
     - name: 📁 Apply custom files
@@ -269,7 +251,7 @@ jobs:
         BUILD_DATE="$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
         mkdir -p files/etc
         cat > files/etc/banner <<EOF
-        
+
         ██████╗ ██╗    - WRX36
         ██╔══██╗██║
         ██║  ██║██║
@@ -425,6 +407,28 @@ jobs:
         files: artifacts-standard/*
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: 🧹 Keep only last 3 releases
+      if: success() && matrix.variant == 'standard'
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        KEEP: ${{ env.KEEP_RELEASES }}
+      run: |
+        set -euo pipefail
+        echo "Keeping newest ${KEEP} releases, deleting older ones..."
+        # gh lists newest first
+        mapfile -t OLD < <(gh release list --repo "$GITHUB_REPOSITORY" --limit 50 --json tagName -q ".[${KEEP}:][].tagName")
+        if [ "${#OLD[@]}" -eq 0 ]; then
+          echo "Nothing to delete."
+          exit 0
+        fi
+        for tag in "${OLD[@]}"; do
+          [ -n "$tag" ] || continue
+          echo "Deleting: $tag"
+          gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag
+        done
+        echo "Remaining:"
+        gh release list --repo "$GITHUB_REPOSITORY" --limit 10
 
     - name: 📋 Show errors on failure
       if: failure()
